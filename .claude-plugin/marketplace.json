@@ -1,0 +1,16 @@
+{
+  "name": "hqv2-marketplace",
+  "owner": {
+    "name": "tom-e-kid"
+  },
+  "plugins": [
+    {
+      "name": "hqv2",
+      "description": "開発の経験とノウハウをまとめた Skill 集",
+      "source": "./"
+    }
+  ],
+  "metadata": {
+    "description": "Codex・Claude Code 共通の開発ノウハウを Skill として配布します。"
+  }
+}

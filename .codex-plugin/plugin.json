@@ -1,0 +1,16 @@
+{
+  "name": "hqv2",
+  "version": "0.1.0",
+  "description": "Codex と Claude Code で使える、開発の経験とノウハウをまとめた Skill 集。",
+  "author": {
+    "name": "tom-e-kid"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "HQv2",
+    "shortDescription": "開発の経験とノウハウをまとめた Skill 集",
+    "longDescription": "開発で繰り返し使う手法を、必要に応じて選べる Skill として提供します。仕様に基づく開発と SOT の維持を担う sdd、作業記録と再開を支える steering を収録しています。",
+    "developerName": "tom-e-kid",
+    "category": "Productivity"
+  }
+}
