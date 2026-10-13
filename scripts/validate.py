@@ -66,8 +66,9 @@ def main():
 
     for relative in (
         "skills/sdd/references/kickoff.md",
-        "skills/sdd/references/change-workflow.md",
+        "skills/sdd/references/direction-review.md",
         "skills/sdd/references/document-rules.md",
+        "skills/sdd/references/document-roles.md",
         "skills/sdd/assets/docs/PRD.md",
         "skills/sdd/assets/docs/FDS.md",
         "skills/sdd/assets/docs/ADD.md",
