@@ -76,6 +76,7 @@ def main():
         "skills/steering/assets/steering/requirements.md",
         "skills/steering/assets/steering/design.md",
         "skills/steering/assets/steering/tasks.md",
+        "skills/gotchas/SKILL.md",
         "examples/project/AGENTS.md",
         "examples/project/CLAUDE.md",
     ):

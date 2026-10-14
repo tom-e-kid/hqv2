@@ -1,15 +1,18 @@
-# HQv2
+# HQ
 
-Codex と Claude Code で共通に使う、開発の経験とノウハウをまとめた Plugin です。
-開発で繰り返し使う手法を、必要に応じて選べる Skill として揃えていきます。
-現在は次の二つを収録しています。各 Skill は単独で使用できます。
+Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
+既存の HQ を引き継ぎ、プラグイン名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
+共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
+現在は次の三つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
 | Skill | 役割 |
 | --- | --- |
 | `sdd` | 壁打ちを通じてプロジェクトの大枠を決め、docs/ に判断基準として残す。後の方針見直しにも使う |
 | `steering` | 具体的な作業の要求・設計・タスクを整理し、合意した範囲を実装・検証し、記録から再開する |
+| `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/steering/20261013-skill-refresh/design.md) に整理しています。
+Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/steering/20261013-plugin-structure/work.md) に残しています。
 
 ## 基本の使い方
 
@@ -18,7 +21,8 @@ Codex と Claude Code で共通に使う、開発の経験とノウハウをま�
 | 場所 | 持つもの |
 | --- | --- |
 | docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
-| `.hq/v2/steering/` | 作業単位の具体的な要求・設計・受け入れ条件・タスク、判断と結果 |
+| `.hq/v2/steering/YYYYMMDD-<作業名>/` | 作業単位の具体的な要求・設計・受け入れ条件・タスク、判断と結果 |
+| `.hq/v2/references/gotchas.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処 |
 | 実装・テスト | 詳細な構造・動作と、その検証 |
 
 作業単位はセッション単位ではありません。同じ作業を複数セッションで続けられます。
@@ -31,7 +35,11 @@ docs/ の大枠が変わる場合は相談・合意して更新します。大�
 
 ## 構成
 
+現在の構成です。
+
 ```text
+AGENTS.md                           Plugin 自体の共通開発ルール
+CLAUDE.md                           AGENTS.md をインポート
 .codex-plugin/plugin.json            Codex 用マニフェスト
 .claude-plugin/plugin.json           Claude Code 用マニフェスト
 .agents/plugins/marketplace.json     Codex 用カタログ
@@ -43,11 +51,34 @@ skills/sdd/
 skills/steering/
   SKILL.md                          作業の具体化・実装・検証・再開
   assets/steering/                   作業文書の雛形
+skills/gotchas/
+  SKILL.md                          落とし穴の参照・記録・整理
 examples/project/                   利用先の指示ファイルの記載例
 ```
 
 Plugin はリポジトリのルートにあります。両製品から同じ `skills/` を読み込みます。
 Codex は `.codex-plugin/` の形式を使用します。ルートのポータブル形式の `plugin.json` は併用しません。
+
+### 構成要素の追加方針
+
+共通 Skill に加え、対象製品が対応する機能を追加できます。定義や設定が必要になった時にディレクトリ・ファイルを作成します。
+
+| 構成要素 | 配置・扱い |
+| --- | --- |
+| 共通 Skill | `skills/<skill-name>/SKILL.md`。両製品で単独利用できる手順とリソース |
+| Claude Code の agent | ルートの `agents/<agent-name>.md`。Claude Code 向けの役割と実行条件 |
+| Hooks | `hooks/` など対象製品の対応する配置。イベント・設定形式の互換性を確認し、必要なら製品別に設定 |
+| MCP サーバー | 対応する設定ファイルと各製品のマニフェスト。共通利用できる部分を共有し、製品固有の接続設定は分離 |
+
+Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/docs/en/plugins-reference#standard-layout) を使用します。共通 Skill は製品固有の agent や Hooks の存在を前提にせず、製品固有の機能の使い方・対応製品は追加時にここへ記載します。
+`skills/<skill-name>/agents/` に置く Skill の付属メタデータは、ルートの agent 定義とは別のものです。
+
+## このリポジトリの開発
+
+Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポートする [CLAUDE.md](CLAUDE.md) から共通ルールを読みます。
+これらはこのリポジトリでの開発用です。Plugin のインストール先へ適用する指示は Skill などの構成要素に持たせます。
+`examples/project/` は利用先プロジェクト向けの例です。
+新しい Skill には、利用先の Gotchas を参照・更新する短い案内を記載します。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
 
 ## 導入
 
@@ -60,15 +91,16 @@ Codex は `.codex-plugin/` の形式を使用します。ルートのポータ�
 
 ```bash
 codex plugin marketplace add .
-codex plugin add hqv2@hqv2-marketplace
+codex plugin add hq@hq-marketplace
 ```
 
-Codex デスクトップでは登録した `hqv2-marketplace` を Plugin のブラウザーで選び、HQv2 をインストールできます。
+Codex デスクトップでは登録した `hq-marketplace` を Plugin のブラウザーで選び、HQ をインストールできます。
 インストール後は新しいチャットで、次のように依頼します。
 
 ```text
 $sdd を使い、プロジェクトの目的・主要要求・基本設計を壁打ちしながら整理してください。
 $steering を使い、合意した大枠に沿って検索機能の改善を相談・実装してください。
+$gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 ```
 
 利用する CLI の対応コマンドは `codex plugin --help` で確認してください。
@@ -87,18 +119,20 @@ claude --plugin-dir .
 
 ```bash
 claude plugin marketplace add .
-claude plugin install hqv2@hqv2-marketplace
+claude plugin install hq@hq-marketplace
 ```
 
 新しいセッションで明示的に使う場合のコマンドは以下です。
 
 ```text
-/hqv2:sdd
-/hqv2:steering
+/hq:sdd
+/hq:steering
+/hq:gotchas
 ```
 
 `sdd` には「プロジェクトの大枠を相談したい」、
-`steering` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」などと依頼します。
+`steering` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」、
+`gotchas` には「今回ハマった点を残したい」「過去の類似問題を確認したい」「古い回避策を整理したい」などと依頼します。
 
 ## 利用先プロジェクトの設定
 
@@ -113,6 +147,12 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 作業記録は `.hq/v2/steering/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。ブランチ・PR・検証などの規約はプロジェクト側で定め、両 Skill はそれに従います。
 
+Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/references/gotchas.md` に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先し、Skill ごとの旧保存先も勝手に移動・重複作成しません。
+
+`sdd`・`steering` は開始・再開時に関連項目を確認し、必要な知見を追記できます。選別・整理は [gotchas](skills/gotchas/SKILL.md) を単独で使って依頼できますが、他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
+
+標準メモリは補助的な想起に任せ、共有する落とし穴の正本はプロジェクト内の記録とします。全文の複製や同期を必須にしません。調査経緯は個別の作業記録、恒久的なルールや正式な手順は AGENTS.md・開発文書に持たせます。Gotchas は合意済みの方針・要求を上書きするものとして扱いません。
+
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
 
@@ -122,19 +162,21 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 ```bash
 python3 scripts/validate.py
-claude plugin validate . --strict
-claude plugin validate .claude-plugin/plugin.json --strict
+claude plugin validate .
+claude plugin validate .claude-plugin/plugin.json
 ```
+
+Claude Code はルートの `CLAUDE.md` がインストール先のプロジェクトコンテキストとして読み込まれない旨を警告します。このファイルは Plugin 自体の開発用なので、この警告は想定内です。それ以外の警告・エラーは内容を確認して解消してください。`--strict` を付けると、この想定内の警告もエラーになり検証に失敗します。
 
 個人の設定を変更せず、Codex でカタログが読み込めることを確認できます。
 
 ```bash
-codex -c "marketplaces.hqv2-marketplace.source=\"$(pwd)\"" \
-  -c 'marketplaces.hqv2-marketplace.source_type="local"' \
-  plugin list --marketplace hqv2-marketplace --available --json
+codex -c "marketplaces.hq-marketplace.source=\"$(pwd)\"" \
+  -c 'marketplaces.hq-marketplace.source_type="local"' \
+  plugin list --marketplace hq-marketplace --available --json
 ```
 
-JSON に `hqv2@hqv2-marketplace` が出ることを確認します。
+JSON に `hq@hq-marketplace` が出ることを確認します。
 カタログの読み込みと Skill の構造検証は、モデルが手順に従って作業することの保証ではありません。
 配布前には新しいセッションで次のケースを確認します。
 
@@ -150,9 +192,13 @@ JSON に `hqv2@hqv2-marketplace` が出ることを確認します。
 | 1ファイルの作業記録 | 要求・設計・タスクと合意状態を混同しない |
 | 明確で軽微な修正 | 一律の文書作成を要求せず、プロジェクトの規約に従う |
 | 非 JavaScript のプロジェクト | package.json や特定のフレームワークを前提にしない |
+| gotchas だけで記録 | 他の Skill を必須にせず、対象プロジェクトに発生条件・問題・対処・確認状況を残す |
+| 類似問題の参照 | 症状だけで同じ原因と決めず、記録の適用条件を照合する。記録がなくても空ファイルを作らない |
+| 未確認の原因・対処 | 仮説と確認済みの事実を区別し、記録の完了を問題の解消と扱わない |
+| 重複・古い回避策の整理 | 根拠を確認して更新し、正式な手順や標準メモリと全文を二重管理しない |
+| Skill ごとの旧 Gotchas | 既存の保存先を尊重し、無断の移動・統合・重複作成をしない |
 
-Hooks・MCP サーバー・製品固有のサブエージェント定義は含めていません。
-`SKILL.md` の付属メタデータ用 `agents/` と、カスタムサブエージェントの定義は別のものです。
+現在の配布内容は共通 Skill のみです。agent・Hooks・MCP サーバーを追加した場合は、構造検証に加えて対象製品でその機能を検証します。
 
 ## 公式資料
 
