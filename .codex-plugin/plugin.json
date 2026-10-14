@@ -1,15 +1,15 @@
 {
-  "name": "hqv2",
-  "version": "0.1.0",
-  "description": "Codex と Claude Code で使える、開発の経験とノウハウをまとめた Skill 集。",
+  "name": "hq",
+  "version": "2.0.0",
+  "description": "Codex・Claude Code 向けの開発ノウハウと支援機能をまとめた Plugin。",
   "author": {
     "name": "tom-e-kid"
   },
   "skills": "./skills/",
   "interface": {
-    "displayName": "HQv2",
-    "shortDescription": "開発の経験とノウハウをまとめた Skill 集",
-    "longDescription": "開発で繰り返し使う手法を、必要に応じて選べる Skill として提供します。プロジェクトの大枠を相談して docs/ に残す sdd、その大枠に沿って具体的な作業を相談・実装・検証・再開する steering を収録しています。",
+    "displayName": "HQ",
+    "shortDescription": "開発ノウハウと支援機能をまとめた Plugin",
+    "longDescription": "開発で繰り返し使う手法を共通 Skill として提供し、製品固有の支援機能も必要に応じて収録する Plugin です。現在は、プロジェクトの大枠を相談して docs/ に残す sdd、具体的な作業を相談・実装・検証・再開する steering、プロジェクトの落とし穴を参照・記録・整理する gotchas を収録しています。",
     "developerName": "tom-e-kid",
     "category": "Productivity"
   }

@@ -1,6 +1,8 @@
 {
-  "name": "hqv2",
-  "version": "0.1.0",
-  "description": "Codex と Claude Code で使える、開発の経験とノウハウをまとめた Skill 集。",
-  "author": { "name": "tom-e-kid" }
+  "name": "hq",
+  "version": "2.0.0",
+  "description": "Codex・Claude Code 向けの開発ノウハウと支援機能をまとめた Plugin。",
+  "author": {
+    "name": "tom-e-kid"
+  }
 }

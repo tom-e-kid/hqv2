@@ -1,8 +1,8 @@
 {
-  "name": "hqv2-marketplace",
+  "name": "hq-marketplace",
   "plugins": [
     {
-      "name": "hqv2",
+      "name": "hq",
       "source": {
         "source": "local",
         "path": "./"
