@@ -1,0 +1,13 @@
+#!/bin/sh
+# HQ commit security Git hook v1; managed by scripts/setup_security.py.
+set -eu
+hq_git_common_dir=$(git rev-parse --git-common-dir)
+if ! command -v python3 >/dev/null 2>&1; then
+  echo 'BLOCKED: Python 3 is required for HQ commit security' >&2
+  exit 1
+fi
+if [ ! -f "$hq_git_common_dir/hq-commit-security/check.py" ]; then
+  echo 'BLOCKED: HQ commit security scanner is missing; restore the installation' >&2
+  exit 1
+fi
+exec python3 "$hq_git_common_dir/hq-commit-security/check.py"

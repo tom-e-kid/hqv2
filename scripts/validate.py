@@ -57,6 +57,27 @@ def validate_release_ready(release, version):
     require(section[2].strip(), f"Empty CHANGELOG section for {version}")
 
 
+def validate_plugin_hooks(codex, claude):
+    relative = codex.get("hooks")
+    require(relative == "./hooks/hooks.json", "Codex must reference the bundled hooks file")
+    require(claude.get("hooks", "./hooks/hooks.json") == relative, "Plugin hook paths differ")
+    config = read_json(relative)
+    events = config.get("hooks")
+    require(isinstance(events, dict) and events.get("SessionStart"), "Missing SessionStart hook")
+    for groups in events.values():
+        require(isinstance(groups, list), "Hook event must contain an array")
+        for group in groups:
+            require(isinstance(group, dict) and isinstance(group.get("hooks"), list), "Invalid hook group")
+            for hook in group["hooks"]:
+                require(isinstance(hook, dict) and hook.get("type") == "command", "Expected a command hook")
+                command = hook.get("command", "")
+                require(isinstance(command, str), "Invalid hook command")
+                resources = re.findall(r'\$\{(?:CLAUDE_PLUGIN_ROOT|PLUGIN_ROOT)\}/([^\s\"]+)', command)
+                require(resources, "Hook command must reference a bundled resource")
+                for resource in resources:
+                    require(contained_path(ROOT, resource).is_file(), "Hook command resource must be a file")
+
+
 def main(release_ready=False):
     codex = read_json(".codex-plugin/plugin.json")
     claude = read_json(".claude-plugin/plugin.json")
@@ -65,6 +86,7 @@ def main(release_ready=False):
         require(codex.get(field) == claude.get(field), f"Plugin {field} differs")
     require(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", codex["name"]), "Invalid plugin name")
     require(re.fullmatch(r"\d+\.\d+\.\d+", codex["version"]), "Invalid release version")
+    validate_plugin_hooks(codex, claude)
     skill_dir = contained_path(ROOT, codex["skills"])
     require(skill_dir.is_dir(), "Codex skills path must be a directory")
 
@@ -95,6 +117,13 @@ def main(release_ready=False):
         require(description and description[1].strip(), f"Missing skill description: {path}")
 
     for relative in (
+        "hooks/hooks.json",
+        "hooks/security_status.py",
+        "hooks/git/pre-commit",
+        "scripts/commit_security.py",
+        "scripts/setup_security.py",
+        "tests/test_commit_security.py",
+        "docs/commit-security.md",
         "skills/sdd/references/kickoff.md",
         "skills/sdd/references/direction-review.md",
         "skills/sdd/references/document-rules.md",
