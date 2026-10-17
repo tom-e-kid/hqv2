@@ -14,8 +14,8 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
-最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/20261013-skill-refresh/design.md) に整理しています。
-Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/20261013-plugin-structure/work.md) に残しています。
+最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
+Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
 
 ## 基本の使い方
 
