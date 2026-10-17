@@ -14,8 +14,8 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
-最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/steering/20261013-skill-refresh/design.md) に整理しています。
-Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/steering/20261013-plugin-structure/work.md) に残しています。
+最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/20261013-skill-refresh/design.md) に整理しています。
+Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/20261013-plugin-structure/work.md) に残しています。
 
 ## 基本の使い方
 
@@ -24,8 +24,8 @@ Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/st
 | 場所 | 持つもの |
 | --- | --- |
 | docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
-| `.hq/v2/steering/active/YYYYMMDD-<作業名>/` | 取り組んでいる、または近いうちに再開する作業の要求・設計・受け入れ条件・タスク、判断と結果 |
-| `.hq/v2/steering/archived/YYYYMMDD-<作業名>/` | 再開を見込む当面の保留や、継続して参照する価値がある作業記録 |
+| `.hq/v2/work/active/YYYYMMDD-<作業名>/` | 取り組んでいる、または近いうちに再開する作業の要求・設計・受け入れ条件・タスク、判断と結果 |
+| `.hq/v2/work/archived/YYYYMMDD-<作業名>/` | 再開を見込む当面の保留や、継続して参照する価値がある作業記録 |
 | `.hq/v2/references/gotchas.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処 |
 | 実装・テスト | 詳細な構造・動作と、その検証 |
 
@@ -171,7 +171,7 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 新規の標準名は `docs/{PRD,FDS,ADD}.md` です。既存の同等文書はそのまま使い、二重管理しません。
 [文書の役割](skills/sdd/references/document-roles.md) に粒度と分担を定義しています。
 
-新しい作業記録は `.hq/v2/steering/active/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
+新しい作業記録は `.hq/v2/work/active/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
 
 Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。新規 worktree の名前は `<repo>@<branch>` を基本とし、ブランチ名の `/` は `-` に置換します。`@` の有無で worktree を判定せず、既存環境・作成ツールの制約を尊重します。
 
@@ -183,7 +183,7 @@ PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.m
 
 リリースの共通手順は [release](skills/release/SKILL.md) にまとめています。git や steering を先に使う必要はありません。CHANGELOG の整理、互換性に基づくバージョン判断、検証、リリース PR、タグ・公開を扱い、準備の依頼だけで公開へ進みません。利用先のブランチ名や配布基盤を固定せず、[リリース規約例](examples/project/.hq/v2/release.md) と [設定の説明](skills/release/references/settings.md) に沿って適用します。
 
-完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終内容を Git に残してから削除します。再開を見込む当面の保留や、継続して参照する価値がある記録は `archived/` に保持できます。終了時の整理手順は [steering の「検証と完了」](skills/steering/SKILL.md#検証と完了) にまとめています。旧配置の `.hq/v2/steering/YYYYMMDD-<作業名>/` やプロジェクト独自の保存方針は尊重し、一律の移行・整理は行いません。
+完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終内容を Git に残してから削除します。再開を見込む当面の保留や、継続して参照する価値がある記録は `archived/` に保持できます。終了時の整理手順は [steering の「検証と完了」](skills/steering/SKILL.md#検証と完了) にまとめています。保存先は `.hq/v2/work/` に統一し、Skill 名は steering のままとします。記録の移動時は関連する参照も更新し、旧保存先に同じ記録を残しません。
 
 作業記録はコードや関連文書とともに Git 管理します。本文は現在地と判断理由・検証結果を示し、変更の経緯は Git history に残します。コミットのタイミングと単位はプロジェクトの規約やユーザーの指示に従います。
 

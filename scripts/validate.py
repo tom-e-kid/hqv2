@@ -159,7 +159,7 @@ def main(release_ready=False):
 
     link_count = 0
     for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts or "work" in path.parts:
+        if ".git" in path.parts or path.is_relative_to(ROOT / "work"):
             continue
         body = path.read_text(encoding="utf-8")
         for target in re.findall(r"\[[^\]]+\]\(([^\s)]+)\)", body):
