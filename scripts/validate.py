@@ -111,6 +111,8 @@ def main(release_ready=False):
         "skills/git/references/settings.md",
         "skills/release/SKILL.md",
         "skills/release/references/settings.md",
+        "skills/pr/SKILL.md",
+        "skills/pr/assets/pr-body.md",
         "CHANGELOG.md",
         ".hq/v2/git.md",
         ".hq/v2/release.md",
@@ -122,6 +124,7 @@ def main(release_ready=False):
         "examples/project/.hq/v2/settings.json",
         "examples/project/.hq/v2/settings.local.example.json",
         "examples/project/.hq/v2/release.md",
+        "examples/project/.hq/v2/pr.md",
     ):
         contained_path(ROOT, relative)
 

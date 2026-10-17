@@ -3,7 +3,7 @@
 Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
 既存の HQ を引き継ぎ、プラグイン名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
 共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
-現在は次の五つの共通 Skill を収録しています。各 Skill は単独で使用できます。
+現在は次の六つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
 | Skill | 役割 |
 | --- | --- |
@@ -11,6 +11,7 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `steering` | 具体的な作業の要求・設計・タスクを整理し、合意した範囲を実装・検証し、記録から再開する |
 | `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 | `git` | Git・GitHub の作業準備、検証を伴うコミット、PR 作成・取り込みを進める |
+| `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/steering/20261013-skill-refresh/design.md) に整理しています。
@@ -61,6 +62,9 @@ skills/gotchas/
 skills/git/
   SKILL.md                          作業ブランチ・worktree・コミット・PR・取り込み
   references/settings.md            設定の読み方と取り込み先の記録
+skills/pr/
+  SKILL.md                          PR のタイトル・本文の整理と作成・更新
+  assets/pr-body.md                 標準の PR 本文書式
 skills/release/
   SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
   references/settings.md            リリースの設定と適用例
@@ -115,6 +119,7 @@ $sdd を使い、プロジェクトの目的・主要要求・基本設計を壁
 $steering を使い、合意した大枠に沿って検索機能の改善を相談・実装してください。
 $gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 $git を使い、この変更を必要な検証の後にコミットしてください。
+$pr を使い、このブランチの変更を develop 向けの PR にまとめてください。
 $release を使い、今回の公開対象とバージョンを整理してリリース準備をしてください。
 ```
 
@@ -144,6 +149,7 @@ claude plugin install hq@hq-marketplace
 /hq:steering
 /hq:gotchas
 /hq:git
+/hq:pr
 /hq:release
 ```
 
@@ -151,6 +157,7 @@ claude plugin install hq@hq-marketplace
 `steering` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」、
 `gotchas` には「今回ハマった点を残したい」「過去の類似問題を確認したい」「古い回避策を整理したい」、
 `git` には「作業ブランチを準備したい」「検証してコミットしたい」「この変更の PR を作成したい」、
+`pr` には「PR 本文を下書きしたい」「既存 PR の説明を現在の差分に合わせたい」、
 `release` には「次のリリースの対象とバージョンを整理したい」「リリース準備をしたい」などと依頼します。
 
 ## 利用先プロジェクトの設定
@@ -172,6 +179,8 @@ Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめていま
 
 ベースの remote・ブランチなどの共有既定値は [.hq/v2/settings.json の例](examples/project/.hq/v2/settings.json) を使って Git 管理し、checkout／worktree 固有の指定は `.hq/v2/.ignore/settings.json` へ分離して Git 管理対象外にします。[ローカル設定例](examples/project/.hq/v2/settings.local.example.json) と [.gitignore の例](examples/project/.gitignore) を必要な範囲で統合してください。`origin`・`develop` は例示です。既存の同等設定はそのまま使えます。既定ベースと進行中の作業の取り込み先を分け、開始時に確定した取り込み先を保持します。読み方と優先順位は [設定の説明](skills/git/references/settings.md) にまとめています。
 
+PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.md) で扱います。独自書式がなければ [標準本文](skills/pr/assets/pr-body.md) を使い、利用先に `.hq/v2/pr.md` があればその指示・書式を優先します。指定がない部分だけ既存の PR テンプレートや標準書式で補い、独自書式へ標準の見出しを重ねません。[利用先向けの記載例](examples/project/.hq/v2/pr.md) は必要な場合に統合し、指示ファイルの作成や他の Skill の実行を必須にしません。
+
 リリースの共通手順は [release](skills/release/SKILL.md) にまとめています。git や steering を先に使う必要はありません。CHANGELOG の整理、互換性に基づくバージョン判断、検証、リリース PR、タグ・公開を扱い、準備の依頼だけで公開へ進みません。利用先のブランチ名や配布基盤を固定せず、[リリース規約例](examples/project/.hq/v2/release.md) と [設定の説明](skills/release/references/settings.md) に沿って適用します。
 
 完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終内容を Git に残してから削除します。再開を見込む当面の保留や、継続して参照する価値がある記録は `archived/` に保持できます。終了時の整理手順は [steering の「検証と完了」](skills/steering/SKILL.md#検証と完了) にまとめています。旧配置の `.hq/v2/steering/YYYYMMDD-<作業名>/` やプロジェクト独自の保存方針は尊重し、一律の移行・整理は行いません。
@@ -180,7 +189,7 @@ Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめていま
 
 Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/references/gotchas.md` に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先し、Skill ごとの旧保存先も勝手に移動・重複作成しません。
 
-`sdd`・`steering`・`git`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
+`sdd`・`steering`・`git`・`pr`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
 
 標準メモリは補助的な想起に任せ、共有する落とし穴の正本はプロジェクト内の記録とします。全文の複製や同期を必須にしません。調査経緯は個別の作業記録、恒久的なルールや正式な手順は AGENTS.md・開発文書に持たせます。Gotchas は合意済みの方針・要求を上書きするものとして扱いません。
 
@@ -250,6 +259,9 @@ python3 scripts/validate.py --release
 | 初回のリリース準備 | 未公開の予定バージョンを自動で上げず、対象・初回番号・CHANGELOG を確認する |
 | 開発と公開のブランチが異なる | 準備の更新を開発側に残し、リリース PR の取り込み先を公開ブランチにする |
 | 公開途中の失敗・同名タグ | 反映済みの段階を確認して再開し、既存タグ・公開済みバージョンを上書きしない |
+| 独自 PR 書式なしの下書き | 標準本文で差分全体と検証を説明し、作成・push は行わない |
+| `.hq/v2/pr.md` がある PR | 指示・独自見出しに従い、標準書式の見出しを追加しない |
+| PR 指示だけがあり、既存テンプレートもある | 指示を守り、未指定の書式は既存テンプレートで補う |
 | Skill ごとの旧 Gotchas | 既存の保存先を尊重し、無断の移動・統合・重複作成をしない |
 
 現在の配布内容は共通 Skill のみです。agent・Hooks・MCP サーバーを追加した場合は、構造検証に加えて対象製品でその機能を検証します。

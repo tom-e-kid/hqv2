@@ -10,7 +10,7 @@
 
 ## 構成と責務
 
-- 共通 Skill は `skills/<skill-name>/` に置く。大枠の策定・見直しは `skills/sdd/`、具体的な作業の相談・実装・検証・再開は `skills/steering/`、プロジェクトの落とし穴の参照・記録・整理は `skills/gotchas/`、Git・GitHub の作業準備・コミット・PR・取り込みは `skills/git/`、CHANGELOG・バージョンの整理とリリースは `skills/release/` が担う。
+- 共通 Skill は `skills/<skill-name>/` に置く。大枠の策定・見直しは `skills/sdd/`、具体的な作業の相談・実装・検証・再開は `skills/steering/`、プロジェクトの落とし穴の参照・記録・整理は `skills/gotchas/`、Git・GitHub の作業準備・コミット・取り込みは `skills/git/`、PR の作成・更新と書式は `skills/pr/`、CHANGELOG・バージョンの整理とリリースは `skills/release/` が担う。
 - Claude Code の agent 定義はルートの `agents/` に置く。`skills/<skill-name>/agents/` に置く Skill の付属メタデータとは区別する。
 - Hooks・MCP などの追加機能は、対象製品が対応する形式・配置を確認して追加する。製品ごとに形式が異なる場合は設定を分ける。使わない機能の空ディレクトリや仮の定義は作らない。
 - Codex は `.codex-plugin/plugin.json`、Claude Code は `.claude-plugin/plugin.json` を使う。構成要素は Plugin のルートを基準に配置・参照する。
@@ -33,7 +33,7 @@ README の検証手順を使う。共通の構造・参照と各製品の配布�
 ## Git・リリース方針
 
 - 通常の作業とリリース準備は `develop` から作業ブランチを作り、PR で `develop` へ取り込む。変更を `develop`・`main` へ直接コミットしない。新規ブランチは `<type>/<short-description>` とし、type は Conventional Commits と揃える。作成ツール名の接頭辞は付けない。
-- コミットのタイトルは Conventional Commits に従う簡潔な一行とする。通常の Git 作業は `git`、リリースは `release` の手順を使い、互いの実行を必須にしない。
+- コミットのタイトルは Conventional Commits に従う簡潔な一行とする。通常の Git 作業は `git`、PR の作成・更新は `pr`、リリースは `release` の手順を使い、互いの実行を必須にしない。利用先の `.hq/v2/pr.md` があれば、その指示・書式を優先する。
 - 利用者に影響する変更は、同じ作業で [CHANGELOG.md](CHANGELOG.md) の `Unreleased` を更新する。
 - リリース時に公開対象とバージョンを確定し、CHANGELOG・関連ファイルを更新して `develop` へ反映する。リリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開する。
 - 設定値は [.hq/v2/settings.json](.hq/v2/settings.json)、必須検証と PR の扱いは [Git 規約](.hq/v2/git.md)、初回バージョン・公開条件は [リリース規約](.hq/v2/release.md) に記載する。ローカル固有の設定は `.hq/v2/.ignore/` に置き、Git 管理しない。
