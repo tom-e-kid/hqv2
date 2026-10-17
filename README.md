@@ -1,7 +1,6 @@
 # HQ
 
 Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
-既存の HQ を引き継ぎ、プラグイン名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
 共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
 現在は次の六つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
@@ -14,98 +13,13 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
-最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
-Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
-
-## 基本の使い方
-
-開発初期は sdd で目的・主要要求・基本設計・技術方針を相談します。その後は steering で一つの目的・範囲を持つ作業を具体化し、実装・検証を進めます。
-
-| 場所 | 持つもの |
-| --- | --- |
-| docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
-| `.hq/v2/work/active/YYYYMMDD-<作業名>/` | 取り組んでいる、または近いうちに再開する作業の要求・設計・受け入れ条件・タスク、判断と結果 |
-| `.hq/v2/work/archived/YYYYMMDD-<作業名>/` | 再開を見込む当面の保留や、継続して参照する価値がある作業記録 |
-| `.hq/v2/references/gotchas.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処 |
-| 実装・テスト | 詳細な構造・動作と、その検証 |
-
-作業単位はセッション単位ではありません。同じ作業を複数セッションで続けられます。
-
-steering は会話と依頼内容を中心に、ブランチ情報や記録の概要・状態から対応する作業を判断します。対象が明らかなら毎回の指定は不要で、候補を区別できない場合だけ確認します。通常は active の候補を絞って対象の記録を読み、archived は過去の判断の参照や再開に必要な場合に確認します。ブランチ名を作業選択の唯一の根拠にはしません。
-
-docs/ の大枠が変わる場合は相談・合意して更新します。大枠の中で決める詳細を逐一 docs/ へ転記する必要はありません。例えば、既存方針に沿ったインデックス追加は作業記録と実装に残し、検索対象や権限方針の変更は関連する大枠へ反映します。
-
-各 Skill は単独で使えます。steering から大枠を変更する場合も、その変更を相談して docs/ に反映でき、sdd の呼び出しは必須ではありません。広い方針の見直しには sdd が使えます。
-
-要求・設計はまとめて合意してから実装へ進みます。同じ範囲の合意を求め直さず、文書ごとの承認を標準にしません。相談・記録だけの依頼では実装へ進みません。
-
-## 構成
-
-現在の構成です。
-
-```text
-AGENTS.md                           Plugin 自体の共通開発ルール
-CLAUDE.md                           AGENTS.md をインポート
-.codex-plugin/plugin.json            Codex 用マニフェスト
-.claude-plugin/plugin.json           Claude Code 用マニフェスト
-.agents/plugins/marketplace.json     Codex 用カタログ
-.claude-plugin/marketplace.json      Claude Code 用カタログ
-skills/sdd/
-  SKILL.md                          共通の入口
-  references/                       大枠の策定・見直し・文書ルール
-  assets/docs/                      全体仕様の雛形
-skills/steering/
-  SKILL.md                          作業の具体化・実装・検証・再開
-  assets/steering/                   作業文書の雛形
-skills/gotchas/
-  SKILL.md                          落とし穴の参照・記録・整理
-skills/git/
-  SKILL.md                          作業ブランチ・worktree・コミット・PR・取り込み
-  references/settings.md            設定の読み方と取り込み先の記録
-skills/pr/
-  SKILL.md                          PR のタイトル・本文の整理と作成・更新
-  assets/pr-body.md                 標準の PR 本文書式
-skills/release/
-  SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
-  references/settings.md            リリースの設定と適用例
-hooks/hooks.json                    両製品の SessionStart Hook（導入状態の確認）
-hooks/git/pre-commit                Git Hook の配布用雛形
-scripts/commit_security.py           コミット対象のセキュリティチェック
-scripts/setup_security.py            Git Hook の導入・更新・状態確認
-docs/commit-security.md              利用先への導入と検出範囲
-examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
-```
-
-Plugin はリポジトリのルートにあります。両製品から同じ `skills/` を読み込みます。
-Codex は `.codex-plugin/` の形式を使用します。ルートのポータブル形式の `plugin.json` は併用しません。
-
-### 構成要素の追加方針
-
-共通 Skill に加え、対象製品が対応する機能を追加できます。定義や設定が必要になった時にディレクトリ・ファイルを作成します。
-
-| 構成要素 | 配置・扱い |
-| --- | --- |
-| 共通 Skill | `skills/<skill-name>/SKILL.md`。両製品で単独利用できる手順とリソース |
-| Claude Code の agent | ルートの `agents/<agent-name>.md`。Claude Code 向けの役割と実行条件 |
-| Hooks | `hooks/` など対象製品の対応する配置。イベント・設定形式の互換性を確認し、必要なら製品別に設定 |
-| MCP サーバー | 対応する設定ファイルと各製品のマニフェスト。共通利用できる部分を共有し、製品固有の接続設定は分離 |
-
-Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/docs/en/plugins-reference#standard-layout) を使用します。共通 Skill は製品固有の agent や Hooks の存在を前提にせず、製品固有の機能の使い方・対応製品は追加時にここへ記載します。
-`skills/<skill-name>/agents/` に置く Skill の付属メタデータは、ルートの agent 定義とは別のものです。
-
-## このリポジトリの開発
-
-Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポートする [CLAUDE.md](CLAUDE.md) から共通ルールを読みます。
-これらはこのリポジトリでの開発用です。Plugin のインストール先へ適用する指示は Skill などの構成要素に持たせます。
-`examples/project/` は利用先プロジェクト向けの例です。
-このリポジトリは `develop` から作業ブランチを作り、PR で `develop` へ取り込みます。利用者に影響する変更は [CHANGELOG.md](CHANGELOG.md) の `Unreleased` に含めます。リリース準備の更新も `develop` へ反映し、公開対象とバージョンを確定してからリリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開します。詳細は [Git 規約](.hq/v2/git.md)・[リリース規約](.hq/v2/release.md)、設定値は [.hq/v2/settings.json](.hq/v2/settings.json) を参照してください。初回リリースは `2.0.0` とし、開発中の CHANGELOG は `Unreleased` で管理します。
-
-新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
+[導入](#導入) · [基本の使い方](#基本の使い方) · [コミット前チェックの導入](#コミット前のセキュリティチェック) · [利用先の設定](#利用先プロジェクトの設定)
 
 ## 導入
 
-以下のコマンドは利用者が必要なクライアントで実行します。
-このリポジトリを作成しただけではインストールや有効化は行われません。
+使うクライアントに合わせて HQ Plugin をインストールします。以下の登録コマンドは、ローカルに取得した **HQ リポジトリのルート**で実行してください。
+
+インストール後は、**HQ を利用したいプロジェクトのリポジトリ**を開いて新しいチャット・セッションを開始します。コミット前チェックは、その利用先で別途有効化します。
 
 ### Codex
 
@@ -165,19 +79,57 @@ claude plugin install hq@hq-marketplace
 `pr` には「PR 本文を下書きしたい」「既存 PR の説明を現在の差分に合わせたい」、
 `release` には「次のリリースの対象とバージョンを整理したい」「リリース準備をしたい」などと依頼します。
 
+## 基本の使い方
+
+開発初期は sdd で目的・主要要求・基本設計・技術方針を相談します。その後は steering で一つの目的・範囲を持つ作業を具体化し、実装・検証を進めます。
+
+| 場所 | 持つもの |
+| --- | --- |
+| docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
+| `.hq/v2/work/active/YYYYMMDD-<作業名>/` | 取り組んでいる、または近いうちに再開する作業の要求・設計・受け入れ条件・タスク、判断と結果 |
+| `.hq/v2/work/archived/YYYYMMDD-<作業名>/` | 再開を見込む当面の保留や、継続して参照する価値がある作業記録 |
+| `.hq/v2/references/gotchas.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処 |
+| 実装・テスト | 詳細な構造・動作と、その検証 |
+
+作業単位はセッション単位ではありません。同じ作業を複数セッションで続けられます。
+
+steering は会話と依頼内容を中心に、ブランチ情報や記録の概要・状態から対応する作業を判断します。対象が明らかなら毎回の指定は不要で、候補を区別できない場合だけ確認します。通常は active の候補を絞って対象の記録を読み、archived は過去の判断の参照や再開に必要な場合に確認します。ブランチ名を作業選択の唯一の根拠にはしません。
+
+docs/ の大枠が変わる場合は相談・合意して更新します。大枠の中で決める詳細を逐一 docs/ へ転記する必要はありません。例えば、既存方針に沿ったインデックス追加は作業記録と実装に残し、検索対象や権限方針の変更は関連する大枠へ反映します。
+
+各 Skill は単独で使えます。steering から大枠を変更する場合も、その変更を相談して docs/ に反映でき、sdd の呼び出しは必須ではありません。広い方針の見直しには sdd が使えます。
+
+要求・設計はまとめて合意してから実装へ進みます。同じ範囲の合意を求め直さず、文書ごとの承認を標準にしません。相談・記録だけの依頼では実装へ進みません。
+
 ## コミット前のセキュリティチェック
 
-HQ は、ステージ済みファイルの具体的なローカルパス、env 系ファイル、API キー・トークン等と思われる値を検出するスクリプトを提供します。Python 標準ライブラリと Git だけで実行します。
+ステージ済みファイルの具体的なローカルパス、env 系ファイル、API キー・トークン等と思われる値を検出し、問題があればコミットを止めます。Python 3.10 以上と Git 2.31 以上を使用し、追加の Python パッケージは不要です。
 
-Plugin のインストール後、利用先プロジェクトで「HQ のコミット前チェックを有効にして」と依頼するか、次を実行します。`<HQ_ROOT>` は HQ Plugin のルートへ置き換えます。
+### チャットで導入を依頼する
+
+コミット前チェックを含む HQ Plugin をインストールした後、**利用先リポジトリ**を開いた新しいチャット・セッションで、次のように依頼します。Codex・Claude Code のどちらでも同じ内容で依頼できます。
+
+```text
+HQ の git Skill を使って、このリポジトリにコミット前セキュリティチェックを導入して。
+
+既存の Git Hooks や core.hooksPath は上書きせず、既存の仕組みがあればそこへ組み込んで。
+導入後は状態を確認し、自動チェックが有効になったか、未確認の点があるかを報告して。
+```
+
+既存 Hook がなければ、検証コードを利用先の Git 管理領域へコピーし、Git Hooks を設置します。状態が `ready` であれば、自動実行する Hook とコピーが揃っています。既存 Hook や `core.hooksPath` がある場合は、自動導入を停止して既存の仕組みへ組み込みます。手動組み込みは状態表示だけでは動作を保証できないため、確認状況も報告させます。
+
+### コマンドで導入する
+
+手動の場合は、利用先リポジトリのルートで次を実行します。`<HQ_ROOT>` はインストールした HQ Plugin のルートへ置き換えます。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" install --repo .
+python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 ```
 
-検証コードを利用先の Git 管理領域へコピーし、通常のコミットは Git の `pre-commit` で検証します。既存 Hook や `core.hooksPath` は上書きしません。コピーは Plugin の移動・削除後も残り、更新は明示的に行います。
+導入後は通常のコミットで自動実行します。新しく clone したリポジトリでは再導入が必要です。同じ Git 管理領域を使う worktree では共有します。コピーは Plugin の移動・削除後も残り、更新は明示的に行います。
 
-Codex・Claude Code の Plugin Hooks は `SessionStart` で導入状態を確認し、未導入や設定切れをエージェントへ通知します。Plugin を読み込むだけでは Git Hook を有効化しません。Codex では Hook 定義への信頼も必要です。導入・更新・例外・制約は [コミット前チェック](docs/commit-security.md) を参照してください。
+Plugin のインストールだけでは Git Hook は有効になりません。Codex・Claude Code の `SessionStart` Hook は未導入や設定切れをエージェントへ通知する補助機能です。Codex では Hook 定義への信頼も必要です。既存 Hook への組み込み、更新・解除、検出範囲・例外・制約は [コミット前チェックの詳細](docs/commit-security.md) を参照してください。
 
 ## 利用先プロジェクトの設定
 
@@ -214,6 +166,76 @@ Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/ref
 
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
+
+## このリポジトリの開発
+
+ここからは HQ Plugin 自体を開発・保守する方向けの説明です。利用先への導入には、前半の手順を使用してください。
+
+既存の HQ を引き継ぎ、プラグイン名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
+
+Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポートする [CLAUDE.md](CLAUDE.md) から共通ルールを読みます。
+これらはこのリポジトリでの開発用です。Plugin のインストール先へ適用する指示は Skill などの構成要素に持たせます。
+`examples/project/` は利用先プロジェクト向けの例です。
+このリポジトリは `develop` から作業ブランチを作り、PR で `develop` へ取り込みます。利用者に影響する変更は [CHANGELOG.md](CHANGELOG.md) の `Unreleased` に含めます。リリース準備の更新も `develop` へ反映し、公開対象とバージョンを確定してからリリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開します。詳細は [Git 規約](.hq/v2/git.md)・[リリース規約](.hq/v2/release.md)、設定値は [.hq/v2/settings.json](.hq/v2/settings.json) を参照してください。初回リリースは `2.0.0` とし、開発中の CHANGELOG は `Unreleased` で管理します。
+
+新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
+
+最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
+Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
+
+## 構成
+
+現在の構成です。
+
+```text
+AGENTS.md                           Plugin 自体の共通開発ルール
+CLAUDE.md                           AGENTS.md をインポート
+.codex-plugin/plugin.json            Codex 用マニフェスト
+.claude-plugin/plugin.json           Claude Code 用マニフェスト
+.agents/plugins/marketplace.json     Codex 用カタログ
+.claude-plugin/marketplace.json      Claude Code 用カタログ
+skills/sdd/
+  SKILL.md                          共通の入口
+  references/                       大枠の策定・見直し・文書ルール
+  assets/docs/                      全体仕様の雛形
+skills/steering/
+  SKILL.md                          作業の具体化・実装・検証・再開
+  assets/steering/                   作業文書の雛形
+skills/gotchas/
+  SKILL.md                          落とし穴の参照・記録・整理
+skills/git/
+  SKILL.md                          作業ブランチ・worktree・コミット・PR・取り込み
+  references/settings.md            設定の読み方と取り込み先の記録
+skills/pr/
+  SKILL.md                          PR のタイトル・本文の整理と作成・更新
+  assets/pr-body.md                 標準の PR 本文書式
+skills/release/
+  SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
+  references/settings.md            リリースの設定と適用例
+hooks/hooks.json                    両製品の SessionStart Hook（導入状態の確認）
+hooks/git/pre-commit                Git Hook の配布用雛形
+scripts/commit_security.py           コミット対象のセキュリティチェック
+scripts/setup_security.py            Git Hook の導入・更新・状態確認
+docs/commit-security.md              利用先への導入と検出範囲
+examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
+```
+
+Plugin はリポジトリのルートにあります。両製品から同じ `skills/` を読み込みます。
+Codex は `.codex-plugin/` の形式を使用します。ルートのポータブル形式の `plugin.json` は併用しません。
+
+### 構成要素の追加方針
+
+共通 Skill に加え、対象製品が対応する機能を追加できます。定義や設定が必要になった時にディレクトリ・ファイルを作成します。
+
+| 構成要素 | 配置・扱い |
+| --- | --- |
+| 共通 Skill | `skills/<skill-name>/SKILL.md`。両製品で単独利用できる手順とリソース |
+| Claude Code の agent | ルートの `agents/<agent-name>.md`。Claude Code 向けの役割と実行条件 |
+| Hooks | `hooks/` など対象製品の対応する配置。イベント・設定形式の互換性を確認し、必要なら製品別に設定 |
+| MCP サーバー | 対応する設定ファイルと各製品のマニフェスト。共通利用できる部分を共有し、製品固有の接続設定は分離 |
+
+Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/docs/en/plugins-reference#standard-layout) を使用します。共通 Skill は製品固有の agent や Hooks の存在を前提にせず、製品固有の機能の使い方・対応製品は追加時にここへ記載します。
+`skills/<skill-name>/agents/` に置く Skill の付属メタデータは、ルートの agent 定義とは別のものです。
 
 ## 検証
 
