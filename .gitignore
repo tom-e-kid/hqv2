@@ -2,3 +2,4 @@
 __pycache__/
 *.pyc
 work/
+/.hq/v2/.ignore/
