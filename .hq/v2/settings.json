@@ -1,0 +1,16 @@
+{
+  "git": {
+    "remote": "origin",
+    "baseBranch": "develop"
+  },
+  "release": {
+    "developmentBranch": "develop",
+    "releaseBranch": "main",
+    "changelog": "CHANGELOG.md",
+    "tagPrefix": "v",
+    "versionFiles": [
+      ".codex-plugin/plugin.json",
+      ".claude-plugin/plugin.json"
+    ]
+  }
+}

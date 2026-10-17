@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 """Validate shared plugin identity, local sources, packaged resources and links."""
 
+import argparse
 import json
 import re
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -27,7 +29,35 @@ def contained_path(base, relative):
     return path
 
 
-def main():
+def validate_release_settings(settings, relative, check_files=False):
+    release = settings.get("release")
+    require(isinstance(release, dict), f"{relative}: missing release settings")
+    for field in ("developmentBranch", "releaseBranch", "changelog"):
+        value = release.get(field)
+        require(isinstance(value, str) and value.strip(), f"{relative}: invalid {field}")
+    require(isinstance(release.get("tagPrefix"), str), f"{relative}: invalid tagPrefix")
+    files = release.get("versionFiles")
+    require(isinstance(files, list), f"{relative}: versionFiles must be an array")
+    for value in [release["changelog"], *files]:
+        require(isinstance(value, str) and value.strip(), f"{relative}: invalid file path")
+        require(not Path(value).is_absolute() and ".." not in Path(value).parts, f"{relative}: expected a repository-relative path")
+        if check_files:
+            require(contained_path(ROOT, value).is_file(), f"{relative}: expected a file: {value}")
+    return release
+
+
+def validate_release_ready(release, version):
+    changelog = (ROOT / release["changelog"]).read_text(encoding="utf-8")
+    unreleased = re.search(r"^## \[Unreleased\]\s*\n(.*?)(?=^## |\Z)", changelog, re.M | re.S)
+    require(unreleased is not None, "Missing Unreleased section")
+    require(not unreleased[1].strip(), "Unreleased must be empty when finalizing a release")
+    section = re.search(rf"^## \[{re.escape(version)}\] - (\d{{4}}-\d{{2}}-\d{{2}})\s*\n(.*?)(?=^## |\Z)", changelog, re.M | re.S)
+    require(section is not None, f"Missing dated CHANGELOG section for {version}")
+    date.fromisoformat(section[1])
+    require(section[2].strip(), f"Empty CHANGELOG section for {version}")
+
+
+def main(release_ready=False):
     codex = read_json(".codex-plugin/plugin.json")
     claude = read_json(".claude-plugin/plugin.json")
     for field in ("name", "version", "description"):
@@ -79,16 +109,27 @@ def main():
         "skills/gotchas/SKILL.md",
         "skills/git/SKILL.md",
         "skills/git/references/settings.md",
+        "skills/release/SKILL.md",
+        "skills/release/references/settings.md",
+        "skills/pr/SKILL.md",
+        "skills/pr/assets/pr-body.md",
+        "CHANGELOG.md",
+        ".hq/v2/git.md",
+        ".hq/v2/release.md",
+        ".hq/v2/settings.json",
         "examples/project/AGENTS.md",
         "examples/project/CLAUDE.md",
         "examples/project/.gitignore",
         "examples/project/.hq/v2/git.md",
         "examples/project/.hq/v2/settings.json",
         "examples/project/.hq/v2/settings.local.example.json",
+        "examples/project/.hq/v2/release.md",
+        "examples/project/.hq/v2/pr.md",
     ):
         contained_path(ROOT, relative)
 
     for relative in (
+        ".hq/v2/settings.json",
         "examples/project/.hq/v2/settings.json",
         "examples/project/.hq/v2/settings.local.example.json",
     ):
@@ -107,9 +148,18 @@ def main():
                 value = target.get(field)
                 require(isinstance(value, str) and value.strip(), f"{relative}: missing {field} for {branch}")
 
+    settings = read_json(".hq/v2/settings.json")
+    release = validate_release_settings(settings, ".hq/v2/settings.json", check_files=True)
+    require(settings["git"].get("baseBranch") == release["developmentBranch"], "Git default base differs from development branch")
+    expected_version_files = {".codex-plugin/plugin.json", ".claude-plugin/plugin.json"}
+    require(expected_version_files.issubset(release["versionFiles"]), "Release versionFiles must include both plugin manifests")
+    validate_release_settings(read_json("examples/project/.hq/v2/settings.json"), "examples/project/.hq/v2/settings.json")
+    if release_ready:
+        validate_release_ready(release, codex["version"])
+
     link_count = 0
     for path in ROOT.rglob("*.md"):
-        if ".git" in path.parts or "work" in path.parts:
+        if ".git" in path.parts or path.is_relative_to(ROOT / "work"):
             continue
         body = path.read_text(encoding="utf-8")
         for target in re.findall(r"\[[^\]]+\]\(([^\s)]+)\)", body):
@@ -124,7 +174,10 @@ def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--release", action="store_true", help="also check the finalized CHANGELOG for the current version")
+    args = parser.parse_args()
     try:
-        main()
+        main(release_ready=args.release)
     except (ValueError, KeyError, OSError, json.JSONDecodeError) as error:
         raise SystemExit(f"Validation failed: {error}")
