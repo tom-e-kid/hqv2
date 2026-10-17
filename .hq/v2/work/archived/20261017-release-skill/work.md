@@ -1,7 +1,8 @@
 # release Skill と develop/main 運用の検証
 
-状態: 実装・検証済み。PR #1 の取り込み前。
-確認日: 2026-10-17（Asia/Tokyo）
+状態: 実装・検証済み。PR #1 で develop へ取り込み済み。検証の根拠として archived に保持。
+整理日: 2026-10-18（Asia/Tokyo）。取り込み済みの作業記録を active から移動。
+検証確認日: 2026-10-17（Asia/Tokyo）
 
 ## 要求と合意
 
