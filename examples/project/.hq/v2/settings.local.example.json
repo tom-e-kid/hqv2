@@ -1,0 +1,11 @@
+{
+  "git": {
+    "baseBranch": "develop_xxx",
+    "branches": {
+      "feat/add-notifications": {
+        "remote": "origin",
+        "baseBranch": "develop_xxx"
+      }
+    }
+  }
+}

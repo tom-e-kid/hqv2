@@ -77,10 +77,35 @@ def main():
         "skills/steering/assets/steering/design.md",
         "skills/steering/assets/steering/tasks.md",
         "skills/gotchas/SKILL.md",
+        "skills/git/SKILL.md",
+        "skills/git/references/settings.md",
         "examples/project/AGENTS.md",
         "examples/project/CLAUDE.md",
+        "examples/project/.gitignore",
+        "examples/project/.hq/v2/git.md",
+        "examples/project/.hq/v2/settings.json",
+        "examples/project/.hq/v2/settings.local.example.json",
     ):
         contained_path(ROOT, relative)
+
+    for relative in (
+        "examples/project/.hq/v2/settings.json",
+        "examples/project/.hq/v2/settings.local.example.json",
+    ):
+        settings = read_json(relative)
+        git = settings.get("git")
+        require(isinstance(git, dict), f"{relative}: missing git settings")
+        for field in ("remote", "baseBranch"):
+            if field in git:
+                require(isinstance(git[field], str) and git[field].strip(), f"{relative}: invalid {field}")
+        branches = git.get("branches", {})
+        require(isinstance(branches, dict), f"{relative}: branches must be an object")
+        for branch, target in branches.items():
+            require(isinstance(branch, str) and branch.strip(), f"{relative}: invalid branch key")
+            require(isinstance(target, dict), f"{relative}: invalid target for {branch}")
+            for field in ("remote", "baseBranch"):
+                value = target.get(field)
+                require(isinstance(value, str) and value.strip(), f"{relative}: missing {field} for {branch}")
 
     link_count = 0
     for path in ROOT.rglob("*.md"):
