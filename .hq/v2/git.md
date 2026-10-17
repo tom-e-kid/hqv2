@@ -25,3 +25,9 @@ PR の省略を恒常的に許可する変更区分は設けない。例外は�
 remote は `origin`、接続先は `git@github.com:tom-e-kid/hqv2.git`。導入時に空のリポジトリへ既存の `main` と `develop` を初期登録し、その後は上記の PR 運用を適用する。既存の main の履歴やマニフェストにバージョンがあっても、公開済みの証拠とは扱わない。
 
 導入時点では自動実行する CI を収録していないため、上記の検証を手動で実施し PR に結果を記載する。GitHub 側のブランチ保護・必須 CI・承認条件を追加した場合は、その条件も取り込み前に確認する。
+
+## コミット前のセキュリティチェック
+
+コミット前は上記の必須検証に加え、`python3 scripts/commit_security.py` を必須とする。[導入手順](../../docs/commit-security.md) に従い、Git の Hook でも実行する。新しい clone では再導入する。`--no-verify` 等で回避せず、検出・検証失敗時はコミットを止める。例外は `.hq/v2/security.json` に対象・規則・内容の fingerprint と理由を記録し、ステージしてレビューする。
+
+スクリプトや Hook を変更した場合は `python3 -m unittest discover -s tests -v` を実施する。コピー済みコードへの反映は `scripts/setup_security.py update` で明示的に行う。

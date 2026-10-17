@@ -6,6 +6,8 @@
 
 ### Added
 
+- ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認と、Codex・Claude Code 向けの SessionStart Hook。
+
 - プロジェクトの大枠を相談し、要求・設計の基準を残す `sdd` Skill。
 - 具体的な作業を相談・実装・検証し、記録から再開する `steering` Skill。
 - プロジェクト共通の落とし穴を参照・記録・整理する `gotchas` Skill。

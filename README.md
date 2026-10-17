@@ -68,6 +68,11 @@ skills/pr/
 skills/release/
   SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
   references/settings.md            リリースの設定と適用例
+hooks/hooks.json                    両製品の SessionStart Hook（導入状態の確認）
+hooks/git/pre-commit                Git Hook の配布用雛形
+scripts/commit_security.py           コミット対象のセキュリティチェック
+scripts/setup_security.py            Git Hook の導入・更新・状態確認
+docs/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
 ```
 
@@ -159,6 +164,20 @@ claude plugin install hq@hq-marketplace
 `git` には「作業ブランチを準備したい」「検証してコミットしたい」「この変更の PR を作成したい」、
 `pr` には「PR 本文を下書きしたい」「既存 PR の説明を現在の差分に合わせたい」、
 `release` には「次のリリースの対象とバージョンを整理したい」「リリース準備をしたい」などと依頼します。
+
+## コミット前のセキュリティチェック
+
+HQ は、ステージ済みファイルの具体的なローカルパス、env 系ファイル、API キー・トークン等と思われる値を検出するスクリプトを提供します。Python 標準ライブラリと Git だけで実行します。
+
+Plugin のインストール後、利用先プロジェクトで「HQ のコミット前チェックを有効にして」と依頼するか、次を実行します。`<HQ_ROOT>` は HQ Plugin のルートへ置き換えます。
+
+```bash
+python3 "<HQ_ROOT>/scripts/setup_security.py" install --repo .
+```
+
+検証コードを利用先の Git 管理領域へコピーし、通常のコミットは Git の `pre-commit` で検証します。既存 Hook や `core.hooksPath` は上書きしません。コピーは Plugin の移動・削除後も残り、更新は明示的に行います。
+
+Codex・Claude Code の Plugin Hooks は `SessionStart` で導入状態を確認し、未導入や設定切れをエージェントへ通知します。Plugin を読み込むだけでは Git Hook を有効化しません。Codex では Hook 定義への信頼も必要です。導入・更新・例外・制約は [コミット前チェック](docs/commit-security.md) を参照してください。
 
 ## 利用先プロジェクトの設定
 
@@ -264,7 +283,7 @@ python3 scripts/validate.py --release
 | PR 指示だけがあり、既存テンプレートもある | 指示を守り、未指定の書式は既存テンプレートで補う |
 | Skill ごとの旧 Gotchas | 既存の保存先を尊重し、無断の移動・統合・重複作成をしない |
 
-現在の配布内容は共通 Skill のみです。agent・Hooks・MCP サーバーを追加した場合は、構造検証に加えて対象製品でその機能を検証します。
+agent・Hooks・MCP サーバー等を追加・変更した場合は、構造検証に加えて対象製品でその機能を検証します。
 
 ## 公式資料
 
