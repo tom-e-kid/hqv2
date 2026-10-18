@@ -134,4 +134,6 @@ refresh は ID・旧 fingerprint・対応回数で保存済み operation を照�
 | Codex カタログ | 文書指定の一時設定付き `plugin list --marketplace hq-marketplace --available --json` | hq@hq-marketplace を認識。制限環境の PATH alias 作成警告は、通常権限で再実行して出ないことを確認。個人設定は変更していない |
 | Skill 専用検証 | 既存の一時仮想環境で quick_validate.py を全 Skill に実行 | 全7件成功。システムの依存・設定は変更していない |
 
-リリース作業ではないため `--release` の検証は対象外。製品内 Hook の起動・継続と、実際の AI レビューへの書き込みを伴うモデルでの動作確認は、既存の合意どおり後続の導入検証として未実施。利用者に影響する2件は CHANGELOG の Unreleased に反映した。
+リリース作業ではないため `--release` の検証は対象外。製品内 Hook の起動・継続と、実際の AI レビューへの書き込みを伴うモデルでの動作確認は、既存の合意どおり後続の導入検証として未実施。
+
+取り込み前の確認で、CHANGELOG の Unreleased の Fixed に記載していたレビュー対応の修正3件を削除した。いずれも同じ Unreleased の Added にある未公開の `pr-feedback` 内の修正であり、公開済みの不具合の修正ではないため。

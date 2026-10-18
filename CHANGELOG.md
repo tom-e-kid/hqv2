@@ -18,14 +18,6 @@
 - CHANGELOG・バージョンの整理からリリース準備・公開を扱う `release` Skill。
 - Codex・Claude Code 向けの共通 Plugin 構成と、利用先向けの規約・設定例。
 
-### Fixed
-
-- PR フィードバックで Resolve 済みスレッドへの人間の追記後も完了済み操作を再試行できるように修正。通常コメント・レビュー本文にも、fingerprint を変えず信頼されていない入力の印を付与。
-
-- PR フィードバックの refresh が、自身の返信・Resolve 済みの結果を superseded に置き換え、finish で実際の結果を記録できなくなる問題を修正。
-
-- PR フィードバックのバッチ内で指摘が変化した場合の復旧、Copilot の login 照合と総評による回数消費、許可外の追記による再処理、セッションの監視取り残しを修正。登録失敗の通知、SSH URL と Git・CLI のエラー案内も改善。
-
 ### Changed
 
 - README に `pr-feedback` の利用先セットアップ手順を追加し、共通設定と Codex・Claude Code ごとの読み込み・Hook・開始・停止の差異を明記。
