@@ -167,6 +167,43 @@ Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/ref
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
 
+### worktree に開発用のローカル設定を用意する
+
+worktree の環境準備は、利用先プロジェクトで指定した手順を使います。HQ がコピー用の Hook を自動導入することはありません。開発用 `.env` などのコピーは可能ですが、必要なファイルを列挙し、コピー先でも Git 管理対象外であることを確認してください。秘密情報の値は文書・ログへ出力せず、既存の設定は上書きしません。接続先の DB やデータ保存先を共有すると並行作業が干渉する場合は、設定値を作業ごとに分けます。
+
+| 利用環境 | ファイルのコピー | 追加の環境準備 |
+| --- | --- | --- |
+| Codex デスクトップアプリのローカル管理 worktree | `.worktreeinclude` | Local environments の Setup script |
+| Claude Code が標準の Git 処理で作成する worktree | `.worktreeinclude` | 作成後に利用先のセットアップ手順を実行 |
+| 手動の `git worktree add` | 利用先のコピー・セットアップ手順を実行 | 必要なら Git Hook と連携 |
+
+#### コピー対象を指定する
+
+利用先リポジトリのルートに `.worktreeinclude` を置きます。次は `.env` と `.env.local` が必要な場合の例です。必要な行だけを採用してください。
+
+```gitignore
+.env
+.env.local
+```
+
+両製品とも `.gitignore` 形式のパターンを使い、一致したファイルのうち Git で除外されているものをコピーします。`.worktreeinclude` にはファイル名だけを記載して共有でき、設定値そのものは Git 管理しません。未追跡ファイル全体や `.hq/v2/.ignore/` 全体を対象にせず、必要な設定ファイルを限定してください。HQ の作業ブランチごとの取り込み先は、コピーした既定値から推測せず、[設定の説明](skills/git/references/settings.md) に従って確認・記録します。
+
+#### Codex
+
+デスクトップアプリで Worktree を選んで作業を開始すると、ローカル管理 worktree に `.worktreeinclude` の対象がコピーされます。コピー元がシンボリックリンクのものはスキップされ、コピー先に既にあるファイルは上書きされません。remote worktree や手動の `git worktree add` には適用されません。詳細は [Codex の worktree 公式ドキュメント](https://learn.chatgpt.com/docs/environments/git-worktrees) を参照してください。
+
+依存関係の導入や設定の生成・加工も必要なら、アプリの設定で Local environments の Setup script を用意し、利用先のセットアップスクリプトを呼び出します。新しいチャットの開始時に worktree を作成すると自動実行されます。設定はプロジェクトの `.codex/` 配下に保存されます。[Local environments の公式ドキュメント](https://learn.chatgpt.com/docs/environments/local-environment) に沿って設定してください。
+
+#### Claude Code
+
+`claude --worktree`、`EnterWorktree`、デスクトップアプリなどで Claude Code が標準の Git 処理を使って worktree を作成する場合も、同じ `.worktreeinclude` が使えます。コピー後、依存関係の導入や設定の生成は、作成先で利用先のセットアップ手順を実行するか Claude に依頼します。[Claude Code の worktree 公式ドキュメント](https://code.claude.com/docs/en/worktrees#copy-gitignored-files-into-worktrees) を参照してください。
+
+`WorktreeCreate` Hook は作成後の追加処理ではなく、標準の worktree 作成処理全体を置き換えます。ファイルのコピーだけなら `.worktreeinclude` を使います。作成自体を独自管理するために Hook を導入する場合は、作成と必要な設定のコピーをスクリプト内で行い、作成先のパスを返す必要があります。この場合 `.worktreeinclude` は自動処理されません。仕様は [WorktreeCreate の公式ドキュメント](https://code.claude.com/docs/en/hooks#worktreecreate) を参照してください。
+
+#### Git から手動で作成する場合
+
+`git worktree add` 自体は `.worktreeinclude` を処理しないため、作成先で利用先のコピー・セットアップ手順を実行します。自動化には `post-checkout` Hook も使えますが、通常の checkout・switch・clone でも呼ばれ、`--no-checkout` では実行されません。導入する場合は既存 Hook と共存させ、初回作成を判別し、再実行しても既存設定を壊さない処理にします。[Git の Hook 仕様](https://git-scm.com/docs/githooks#_post_checkout) を確認してください。
+
 ## このリポジトリの開発
 
 ここからは HQ Plugin 自体を開発・保守する方向けの説明です。利用先への導入には、前半の手順を使用してください。
