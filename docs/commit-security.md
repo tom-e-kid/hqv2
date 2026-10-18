@@ -111,7 +111,7 @@ python3 "<HQ_ROOT>/scripts/setup_security.py" uninstall --repo .
 
 ## Plugin Hooks と保証の境界
 
-Codex・Claude Code 向けの `hooks/hooks.json` で `SessionStart` を提供します。Git リポジトリで導入状態を読み取り、未導入・設定切れ・更新候補をエージェントへ通知します。利用先への書き込み・自動インストールはしません。正常時は何も通知しません。
+Codex 向けの `hooks/codex.json`、Claude Code 向けの `hooks/hooks.json` で `SessionStart` を提供します。Git リポジトリで導入状態を読み取り、未導入・設定切れ・更新候補をエージェントへ通知します。利用先への書き込み・自動インストールはしません。正常時は何も通知しません。
 
 Codex では Plugin の有効化に加え Hook 定義への信頼が必要です。対応するバージョン・実行環境で確認してください。共通設定は両製品が提供する `CLAUDE_PLUGIN_ROOT` を利用します。
 

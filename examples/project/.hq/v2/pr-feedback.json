@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "enabled": false,
+  "repository": "OWNER/REPOSITORY",
+  "reviewers": ["Copilot"],
+  "maxRounds": 3,
+  "quietSeconds": 120,
+  "waitSeconds": 600,
+  "pollSeconds": 30,
+  "actions": {"fix": false, "push": false, "reply": false, "resolve": false}
+}

@@ -10,6 +10,40 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_feedback.py\"",
+            "timeout": 60
+          }
+        ],
+        "matcher": "Bash|.*create_pull_request|.*pull_request_create"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_feedback.py\"",
+            "timeout": 660
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_feedback.py\"",
+            "timeout": 3
+          }
+        ]
+      }
     ]
   }
 }

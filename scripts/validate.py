@@ -58,11 +58,14 @@ def validate_release_ready(release, version):
 
 
 def validate_plugin_hooks(codex, claude):
-    relative = codex.get("hooks")
-    require(relative == "./hooks/hooks.json", "Codex must reference the bundled hooks file")
-    require(claude.get("hooks", "./hooks/hooks.json") == relative, "Plugin hook paths differ")
-    config = read_json(relative)
-    events = config.get("hooks")
+    require(codex.get("hooks") == "./hooks/codex.json", "Codex must reference its bundled hooks file")
+    require(claude.get("hooks", "./hooks/hooks.json") == "./hooks/hooks.json", "Unexpected Claude hook path")
+    for relative in ("hooks/codex.json", "hooks/hooks.json"):
+        validate_hook_file(relative)
+
+
+def validate_hook_file(relative):
+    events = read_json(relative).get("hooks")
     require(isinstance(events, dict) and events.get("SessionStart"), "Missing SessionStart hook")
     for groups in events.values():
         require(isinstance(groups, list), "Hook event must contain an array")
@@ -118,6 +121,13 @@ def main(release_ready=False):
 
     for relative in (
         "hooks/hooks.json",
+        "hooks/codex.json",
+        "hooks/pr_feedback.py",
+        "scripts/pr_feedback.py",
+        "tests/test_pr_feedback.py",
+        "docs/pr-feedback.md",
+        "skills/pr-feedback/SKILL.md",
+        "examples/project/.hq/v2/pr-feedback.json",
         "hooks/security_status.py",
         "hooks/git/pre-commit",
         "scripts/commit_security.py",
