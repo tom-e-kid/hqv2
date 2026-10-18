@@ -288,6 +288,14 @@ class Monitor:
             resolved = {x['id'] for x in snapshot['reviewThreads'] if x['isResolved']}
             batch = []
             for old in state['batch']:
+                key = digest([old['id'], old['fingerprint'], state['rounds']])
+                operation = state.get('operations', {}).get(key, {})
+                # Keep completed operations available to retry/finish. Legacy
+                # thread operations lack intent, so require a confirmed Resolve.
+                resolve_requested = operation.get('resolveRequested', old['kind'] == 'thread')
+                if operation.get('replyUrl') and (not resolve_requested or operation.get('resolved')):
+                    batch.append(old)
+                    continue
                 if old['id'] in current:
                     latest = current[old['id']]
                     if old.get('requiresReevaluation') or old.get('superseded') or old['fingerprint'] != latest['fingerprint']:
@@ -438,9 +446,10 @@ class Monitor:
                         raise FeedbackError('Superseded feedback reappeared; refresh and re-evaluate')
                     continue
                 key = digest([item['id'], item['fingerprint'], state['rounds']])
+                already_replied = not entry.get('resolve') and state.get('operations', {}).get(key, {}).get('replyUrl')
                 already_resolved = (entry.get('resolve') and threads.get(entry['id'], {}).get('isResolved')
                                     and state.get('operations', {}).get(key, {}).get('replyUrl'))
-                if not already_resolved and (entry['id'] not in current or current[entry['id']]['fingerprint'] != item['fingerprint']):
+                if not (already_replied or already_resolved) and (entry['id'] not in current or current[entry['id']]['fingerprint'] != item['fingerprint']):
                     raise FeedbackError('Feedback changed or was resolved; use refresh and re-evaluate before replying')
                 if entry.get('resolve'):
                     thread = threads.get(entry['id'])
@@ -459,6 +468,9 @@ class Monitor:
                 operation = operations.setdefault(key, {})
                 if operation.get('decision') and (operation['decision'], operation['reason']) != (entry['decision'], entry['reason']):
                     raise FeedbackError('A reply already exists for a different decision; inspect it before editing')
+                if entry.get('resolve'):
+                    operation['resolveRequested'] = True
+                    self.save(state)
                 existing = next((c for c in comments if (c.get('author') or {}).get('login') == viewer and marker in c['body']), None)
                 if existing:
                     operation['replyUrl'] = existing['url']
@@ -466,7 +478,7 @@ class Monitor:
                     if self.github.pr(number)['head'] != pr['head']:
                         raise FeedbackError('Head changed before reply')
                     # Persist intent before sending. On ambiguous failure the next call looks up the marker.
-                    operation.update(decision=entry['decision'], reason=entry['reason'])
+                    operation.update(decision=entry['decision'], reason=entry['reason'], resolveRequested=bool(entry.get('resolve')))
                     self.save(state)
                     body = f'{marker}\n{entry["decision"]}: {entry["reason"]}\n\n対象: {item["url"]}'
                     if pushed_head and entry['decision'] == 'fix':

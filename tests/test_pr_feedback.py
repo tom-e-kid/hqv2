@@ -419,6 +419,74 @@ class MonitorTest(unittest.TestCase):
         self.monitor.finish(1, 'session', report)
         self.assertEqual(len(self.fake.writes), 2)
 
+    def resolved_thread_refresh(self, fail_comment):
+        self.thread()
+        self.fake.data['comments'] = [comment('c2', body='Second bug')]
+        result = self.monitor.poll(1, 'session')
+        original_thread = next(x for x in result['items'] if x['id'] == 'thread')
+        report = [{'id': 'thread', 'decision': 'skip', 'reason': 'Verified', 'resolve': True},
+                  {'id': 'c2', 'decision': 'skip', 'reason': 'Verified comment'}]
+        original_api = self.fake.api
+        if fail_comment:
+            def api(endpoint, *args, **kwargs):
+                if '/issues/' in endpoint:
+                    raise pf.FeedbackError('comment POST failed')
+                return original_api(endpoint, *args, **kwargs)
+            self.fake.api = api
+            with self.assertRaisesRegex(pf.FeedbackError, 'comment POST failed'):
+                self.monitor.respond(1, 'session', report)
+            self.fake.api = original_api
+            self.fake.data['comments'][0]['body'] = 'Edited second bug'
+        else:
+            self.monitor.respond(1, 'session', report)
+        reply_url = report[0]['replyUrl']
+        self.assertTrue(report[0]['resolved'])
+        state = self.monitor.refresh(1, 'session')
+        refreshed_thread = next(x for x in state['batch'] if x['id'] == 'thread')
+        self.assertEqual(refreshed_thread, original_thread)
+        self.assertNotIn('superseded', refreshed_thread)
+        self.assertNotIn('requiresReevaluation', refreshed_thread)
+        self.assertEqual(state['rounds'], 1)
+        if fail_comment:
+            updated_comment = next(x for x in state['batch'] if x['id'] == 'c2')
+            self.assertTrue(updated_comment['requiresReevaluation'])
+            report[1].update(fingerprint=updated_comment['fingerprint'], reason='Re-evaluated edited comment')
+            self.monitor.respond(1, 'session', report)
+        finished = self.monitor.finish(1, 'session', report)
+        recorded = finished['reports'][-1]['items'][0]
+        self.assertEqual((recorded['decision'], recorded['replyUrl'], recorded['resolved']), ('skip', reply_url, True))
+        self.assertEqual(len(self.fake.writes), 3)
+
+    def test_refresh_preserves_own_resolve_after_partial_respond_and_edit(self):
+        self.resolved_thread_refresh(fail_comment=True)
+
+    def test_refresh_preserves_own_resolve_after_complete_respond(self):
+        self.resolved_thread_refresh(fail_comment=False)
+
+    def test_refresh_preserves_completed_reply_without_resolve_after_edit(self):
+        result = self.monitor.poll(1, 'session')
+        report = self.report(result)
+        self.fake.data['comments'][0]['body'] = 'Edited after our reply'
+        state = self.monitor.refresh(1, 'session')
+        self.assertEqual(state['batch'], result['items'])
+        # Retrying the completed operation does not post again or lose its report.
+        self.monitor.respond(1, 'session', report)
+        self.monitor.finish(1, 'session', report)
+        self.assertEqual(len(self.fake.writes), 1)
+        self.assertEqual(self.monitor.poll(1, 'session')['round'], 2)
+
+    def test_refresh_does_not_preserve_reply_with_unconfirmed_resolve(self):
+        thread = self.thread()
+        self.monitor.poll(1, 'session')
+        report = [{'id': 'thread', 'decision': 'skip', 'reason': 'Verified', 'resolve': True}]
+        with patch.object(self.fake, 'graphql', side_effect=pf.FeedbackError('Resolve failed')):
+            with self.assertRaisesRegex(pf.FeedbackError, 'Resolve failed'):
+                self.monitor.respond(1, 'session', report)
+        # A later external Resolve cannot turn our incomplete operation into a success.
+        thread['isResolved'] = True
+        state = self.monitor.refresh(1, 'session')
+        self.assertEqual(state['batch'][0]['superseded'], 'resolved')
+
     def test_copilot_summary_is_completion_without_consuming_cap(self):
         self.monitor.config['reviewers'] = ['copilot-pull-request-reviewer[bot]']
         state = self.monitor.read(1)

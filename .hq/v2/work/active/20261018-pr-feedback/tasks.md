@@ -75,3 +75,16 @@
 全65テスト、構造・参照、両製品の配布設定、Skill 専用検証が成功。Copilot の login と総評は公開 PR への読み取り専用 API でも確認した。実際の AI レビュー返信・Resolve と製品内の Hook の動作は、引き続き後続の導入検証として未実施。
 
 GitHub の PR #6 はコメント・レビュー投稿とも0件で、今回の FB はローカルファイルが対象。返信・Resolve は不要。最新 develop には PR #5 の worktree 文書変更が入り、PR #6 が競合していることも確認した。レビュー修正は `135829d` に記録した。`origin/develop` の `136014a` を作業ブランチへ取り込み、唯一競合した CHANGELOG の両方の項目を保持して解消した。README・検証手順・Git Skill・利用先の指示例は自動統合結果を確認し、PR #5 の内容を保持した。
+
+
+## 再レビュー: refresh による完了結果の消失（2026-10-18）
+
+ユーザーが報告した2パターンを回帰テストに追加し、修正前はいずれも自身の Resolve 済みスレッドが superseded となって失敗することを確認した。
+
+refresh は ID・旧 fingerprint・対応回数で保存済み operation を照合し、返信済みで、Resolve を要求した場合はその成功も確認済みの項目を元のまま保持する。Resolve 要求の有無は respond で保存する。旧状態のスレッドに要求情報がない場合は、確認済みの Resolve を必要とする保守的な扱いとした。完了済み返信の再試行は再投稿せず、元の結果で finish する。完了後の変更は、引き続き対応対象であれば次のバッチで再評価する。
+
+- 指定ケース1: スレッドの skip + 返信・Resolve 成功後に通常コメントの投稿を失敗させ、そのコメントを編集して refresh。スレッドの元の項目・返信 URL・resolved: true を維持し、コメントの再評価・再試行後に実際の結果で finish できる。
+- 指定ケース2: 全件の respond 成功後に refresh。superseded / requiresReevaluation を追加せず、元の報告で finish できる。
+- 補足ケース: 返信だけ成功し Resolve が失敗した項目は、後から他者が Resolve しても自身の完了結果として保持しない。Resolve 不要の返信済み項目は、編集後も再投稿せず完了し、変更を次のバッチで検出する。
+
+検証: `python3 -m unittest discover -s tests -v` は全69件成功（従来65件 + 今回4件）。`python3 scripts/validate.py` と diff check も成功。CHANGELOG と運用手順を更新した。配布設定・Skill 定義には変更がなく、前回の製品別構造検証の結果を再利用する。実際の AI レビューへの書き込み・製品内 Hook の動作検証は従来どおり未実施。

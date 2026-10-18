@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- PR フィードバックの refresh が、自身の返信・Resolve 済みの結果を superseded に置き換え、finish で実際の結果を記録できなくなる問題を修正。
+
 - PR フィードバックのバッチ内で指摘が変化した場合の復旧、Copilot の login 照合と総評による回数消費、許可外の追記による再処理、セッションの監視取り残しを修正。登録失敗の通知、SSH URL と Git・CLI のエラー案内も改善。
 
 ### Changed

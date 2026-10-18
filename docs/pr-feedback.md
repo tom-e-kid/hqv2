@@ -72,7 +72,7 @@ python3 "<HQ_ROOT>/scripts/pr_feedback.py" stop --repo . --pr 123 --session SESS
 python3 "<HQ_ROOT>/scripts/pr_feedback.py" refresh --repo . --pr 123 --session SESSION
 ```
 
-`refresh` は現在のバッチ項目だけを再取得し、回数を増やさず変更前の内容を履歴に残します。変更された項目は最新の内容・追記を読んで再評価し、報告の `fingerprint` を status が返す最新値に更新します。`requiresReevaluation: true` の項目は、この値が一致しなければ返信・完了できません。変更がない項目の返信結果は維持します。別の新着項目は次のバッチで扱います。
+`refresh` は現在のバッチ項目だけを再取得し、回数を増やさず変更前の内容を履歴に残します。変更された項目は最新の内容・追記を読んで再評価し、報告の `fingerprint` を status が返す最新値に更新します。`requiresReevaluation: true` の項目は、この値が一致しなければ返信・完了できません。保存済みの operation で返信成功と、要求した場合は Resolve 成功を確認できる項目は、元の項目と実際の結果を維持します。完了後に内容が変わり、引き続き対応対象となる場合は finish 後の次のバッチで再評価します。別の新着項目も次のバッチで扱います。
 
 削除または Resolve で対象から外れた項目には `superseded` が付きます。その項目の報告は `decision: "superseded"`、`reason` は保存された `superseded` の値（`resolved` または `no-longer-present`）、`resolve: false` とします。これだけは返信なしで finish できます。修正・解決を行ったとは扱いません。再出現・再オープンしていれば再度 refresh と評価を求めます。状態ファイルの削除や回数のリセットは不要です。
 
