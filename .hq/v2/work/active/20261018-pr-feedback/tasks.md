@@ -1,6 +1,6 @@
 # pr-feedback の計画と現在地
 
-状態: PR #6 の Claude レビュー9件に対応済み・取り込み待ち（導入検証は今回の完了条件外）
+状態: PR #6 の初回レビュー・再レビューに対応済み・取り込み待ち（導入検証は今回の完了条件外）
 
 概要: AI Reviewer の FB の待機・分類・修正・返信・Resolve・再確認を、利用先のオプトインで最大3回実行する。初版から Codex・Claude Code を対象とし、セッション終了後の常駐監視は含めない。
 
@@ -43,7 +43,7 @@
 
 ユーザーが別リポジトリで両製品の実機確認と実際の AI レビューへの対応を検証する。結果に応じて後続の修正を検討する。今回の PR はその検証を待たずに作成・完了できる。
 
-## 検証・結果
+## 初回実装時の検証・結果
 
 | 対象 | 方法 | 結果・限界 |
 | --- | --- | --- |
@@ -70,9 +70,32 @@
 
 ## PR #6 の Claude レビュー対応（2026-10-18）
 
-ユーザーがローカルの `pr6-review.md` を指定し、対応の必要性の精査と必要な修正を依頼した。全9件を修正対象と判断し、実装・回帰テスト・文書を更新した。理由と詳細は [レビュー対応記録](review-response.md) を参照する。
+出典: Claude によるローカルレビュー（リポジトリ外）。対象は `79def40`。ユーザーの依頼に基づき全9件を修正対象と判断した。
 
-全65テスト、構造・参照、両製品の配布設定、Skill 専用検証が成功。Copilot の login と総評は公開 PR への読み取り専用 API でも確認した。実際の AI レビュー返信・Resolve と製品内の Hook の動作は、引き続き後続の導入検証として未実施。
+| 指摘 | 判断と根拠 |
+| --- | --- |
+| High 1: バッチ内変更後に復旧不能 | fix。respond の内容照合と finish の返信必須条件は妥当だが、stop/register は内容を更新せず閉塞する |
+| High 2: Copilot の login 不一致 | fix。実際の GraphQL API で copilot-pull-request-reviewer を確認し、設定例の Copilot では一致しない |
+| Medium 3: 総評が毎回バッチになる | fix。実際の Copilot の総評は指摘なしでも本文を持つ。本文を無条件に対象にすると回数消費が発生する |
+| Medium 4: 許可外の返信で再処理される | fix。ただし本文が渡る事実だけで任意の push が可能とは断定できない。既存 Skill も本文を指示・権限として扱わない。新バッチを発生させる入力の制限は必要 |
+| Low: SSH URL・末尾スラッシュ | fix。対象範囲内の github.com の有効な origin を拒否する |
+| Low: Git 失敗が認証エラー扱い | fix。ローカル Git の失敗を通信・認証の問題と案内するのは不正確 |
+| Low: Hook 登録失敗が見えない | fix。branch 不一致などがモデルの文脈に返らない |
+| Low: 同一セッションの2本目で監視が残る | fix。session の紐付け上書きにより最初の監視が取り残される |
+| Low: respond の report 不足メッセージ | fix。要求する操作名が誤っている |
+
+設計上の結論は [設計](design.md) の「PR #6 のレビュー対応で補強した条件」を参照する。監視期間・最大3回・対象製品・外部操作の許可範囲は変更していない。
+
+このレビュー対応時の検証結果:
+
+- `python3 -m unittest discover -s tests -v`: 全65件成功（従来49件、新規16件）。編集後の復旧、削除・他者による Resolve・再オープン、push 後の追記、途中投稿からの再開、API/head 競合、Copilot の総評と完了検出、許可外の追記、登録失敗・セッション引き継ぎを確認。
+- `python3 scripts/validate.py`、`git diff --check`: 成功。
+- Claude Code の root/manifest 検証: 成功。既知のルート CLAUDE.md 警告のみ。
+- Codex の一時設定付きカタログ検証: hq@hq-marketplace を認識。制限環境で PATH alias を作れない警告が出たが、カタログ取得自体は成功。
+- Skill 専用検証: 通常の Python には PyYAML がなく起動できなかったため、既存の一時仮想環境で実行し成功。システムの依存・設定は変更していない。
+- 修正した GitHub.snapshot を microsoft/vscode#342304 に対して読み取り専用で実行: Copilot の login、本文のある総評、総評を除外した対応対象0件を確認。authorAssociation を含むクエリも API が受理。最初の制限環境での接続失敗後、承認されたネットワークアクセスで確認した。
+
+実際の AI レビュー返信・Resolve と製品内の Hook の動作は、引き続き後続の導入検証として未実施。
 
 GitHub の PR #6 はコメント・レビュー投稿とも0件で、今回の FB はローカルファイルが対象。返信・Resolve は不要。最新 develop には PR #5 の worktree 文書変更が入り、PR #6 が競合していることも確認した。レビュー修正は `135829d` に記録した。`origin/develop` の `136014a` を作業ブランチへ取り込み、唯一競合した CHANGELOG の両方の項目を保持して解消した。README・検証手順・Git Skill・利用先の指示例は自動統合結果を確認し、PR #5 の内容を保持した。
 
@@ -88,3 +111,27 @@ refresh は ID・旧 fingerprint・対応回数で保存済み operation を照�
 - 補足ケース: 返信だけ成功し Resolve が失敗した項目は、後から他者が Resolve しても自身の完了結果として保持しない。Resolve 不要の返信済み項目は、編集後も再投稿せず完了し、変更を次のバッチで検出する。
 
 検証: `python3 -m unittest discover -s tests -v` は全69件成功（従来65件 + 今回4件）。`python3 scripts/validate.py` と diff check も成功。CHANGELOG と運用手順を更新した。配布設定・Skill 定義には変更がなく、前回の製品別構造検証の結果を再利用する。実際の AI レビューへの書き込み・製品内 Hook の動作検証は従来どおり未実施。
+
+
+## 再レビュー: Low 3件（2026-10-18）
+
+出典: Claude によるローカルレビュー（リポジトリ外）をユーザーがチャットで提示。全3件を修正対象と判断した。
+
+| 指摘 | 判断と根拠・対応 |
+| --- | --- |
+| Resolve 済みスレッドの追記で再試行が止まる | fix。Resolve 済みなら再度 Resolve しないため、事前の投稿者チェックは不要。未 Resolve の場合だけチェックする。MEMBER の追記後も resolve: true のまま再試行・finish でき、未 Resolve の人間の追記は引き続き拒否する回帰テストを追加 |
+| 通常コメント・レビュー本文に untrustedContext がない | fix。全本文を信頼されていない入力として扱う設計と出力が不一致。全種類で fingerprint 計算後に付与し、修正前に採取した3種類の fingerprint が変わらないことをテスト |
+| レビュー対応記録の出典が共有されず、検証が二重管理される | fix。指摘ごとの判断・根拠と検証結果を本ファイルの既存レビュー対応節へ統合し、別ファイルを廃止。設計上の結論は設計文書へ残し、リンクと出典の表現を更新 |
+
+今回の検証結果（`docs/validation.md` に従って実行）:
+
+| 対象 | 方法 | 結果・限界 |
+| --- | --- | --- |
+| 回帰テストの再現 | 修正前に今回のテストを実行 | Resolve 済みへの MEMBER 追記後の再試行でエラー、通常コメント・レビュー本文の untrustedContext 欠落で失敗することを確認 |
+| 全自動テスト | `python3 -m unittest discover -s tests -v` | 全72件成功（従来69件 + 今回3件）。Resolve 済みの再試行・finish、未 Resolve での人間の追記の拒否、3種類すべての印と修正前の fingerprint の保持を確認 |
+| 構造・参照 | `python3 scripts/validate.py`、`git diff --check` | 成功。全7 Skill・両カタログ・107ローカル参照を確認。廃止した記録とローカルレビューのファイル名への参照が残っていないことも検索で確認 |
+| Claude Code 配布設定 | `claude plugin validate .`、`claude plugin validate .claude-plugin/plugin.json` | 両方成功。想定済みのルート CLAUDE.md 警告のみ |
+| Codex カタログ | 文書指定の一時設定付き `plugin list --marketplace hq-marketplace --available --json` | hq@hq-marketplace を認識。制限環境の PATH alias 作成警告は、通常権限で再実行して出ないことを確認。個人設定は変更していない |
+| Skill 専用検証 | 既存の一時仮想環境で quick_validate.py を全 Skill に実行 | 全7件成功。システムの依存・設定は変更していない |
+
+リリース作業ではないため `--release` の検証は対象外。製品内 Hook の起動・継続と、実際の AI レビューへの書き込みを伴うモデルでの動作確認は、既存の合意どおり後続の導入検証として未実施。利用者に影響する2件は CHANGELOG の Unreleased に反映した。

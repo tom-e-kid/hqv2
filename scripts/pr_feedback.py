@@ -160,7 +160,7 @@ def items_from(snapshot, reviewers, ignore_review_bodies=('copilot-pull-request-
                 trigger = [c for c in content if login((c.get('author') or {}).get('login', '')) in allowed
                            or c.get('authorAssociation') in ('OWNER', 'MEMBER', 'COLLABORATOR')]
                 item['triggerFingerprint'] = digest(trigger)
-                item['untrustedContext'] = True
+            item['untrustedContext'] = True
             items.append(item)
     return items
 
@@ -455,9 +455,10 @@ class Monitor:
                     thread = threads.get(entry['id'])
                     if not thread or (not thread['isResolved'] and not thread['viewerCanResolve']):
                         raise FeedbackError('Item is not a resolvable review thread')
-                    authors = {login((c.get('author') or {}).get('login', '')) for c in thread['comments']['nodes']}
-                    if authors - {login(viewer), *(login(x) for x in self.config['reviewers'])}:
-                        raise FeedbackError('Human/unknown follow-up prevents automatic Resolve')
+                    if not thread['isResolved']:
+                        authors = {login((c.get('author') or {}).get('login', '')) for c in thread['comments']['nodes']}
+                        if authors - {login(viewer), *(login(x) for x in self.config['reviewers'])}:
+                            raise FeedbackError('Human/unknown follow-up prevents automatic Resolve')
             operations = state.setdefault('operations', {})
             for entry in report:
                 item = batch[entry['id']]

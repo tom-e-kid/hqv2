@@ -463,6 +463,39 @@ class MonitorTest(unittest.TestCase):
     def test_refresh_preserves_own_resolve_after_complete_respond(self):
         self.resolved_thread_refresh(fail_comment=False)
 
+    def test_retry_completed_resolve_with_member_followup_after_partial_respond(self):
+        thread = self.thread()
+        self.fake.data['comments'] = [comment('c2', body='Second bug')]
+        self.monitor.poll(1, 'session')
+        report = [{'id': 'thread', 'decision': 'skip', 'reason': 'Verified', 'resolve': True},
+                  {'id': 'c2', 'decision': 'skip', 'reason': 'Verified comment'}]
+        original_api = self.fake.api
+        def api(endpoint, *args, **kwargs):
+            if '/issues/' in endpoint:
+                raise pf.FeedbackError('comment POST failed')
+            return original_api(endpoint, *args, **kwargs)
+        with patch.object(self.fake, 'api', side_effect=api):
+            with self.assertRaisesRegex(pf.FeedbackError, 'comment POST failed'):
+                self.monitor.respond(1, 'session', report)
+        thread['comments']['nodes'].append(dict(comment('member', 'maintainer', 'Follow-up after Resolve'), authorAssociation='MEMBER'))
+        self.assertTrue(thread['isResolved'])
+        self.monitor.respond(1, 'session', report)
+        self.assertTrue(report[0]['resolve'])
+        self.assertTrue(report[0]['resolved'])
+        finished = self.monitor.finish(1, 'session', report)
+        self.assertEqual(finished['reports'][-1]['items'][0], report[0])
+        self.assertEqual(len(self.fake.writes), 3)
+
+    def test_unresolved_thread_with_member_followup_still_blocks_resolve(self):
+        thread = self.thread()
+        thread['comments']['nodes'].append(dict(comment('member', 'maintainer', 'Keep this open'), authorAssociation='MEMBER'))
+        self.monitor.poll(1, 'session')
+        report = [{'id': 'thread', 'decision': 'skip', 'reason': 'Verified', 'resolve': True}]
+        with self.assertRaisesRegex(pf.FeedbackError, 'Human/unknown follow-up'):
+            self.monitor.respond(1, 'session', report)
+        self.assertFalse(thread['isResolved'])
+        self.assertEqual(self.fake.writes, [])
+
     def test_refresh_preserves_completed_reply_without_resolve_after_edit(self):
         result = self.monitor.poll(1, 'session')
         report = self.report(result)
@@ -577,6 +610,24 @@ class MonitorTest(unittest.TestCase):
 
 
 class CollectionTest(unittest.TestCase):
+    def test_all_item_kinds_are_untrusted_without_changing_fingerprints(self):
+        data = snapshot()
+        data['reviews'][0]['body'] = 'Review finding'
+        data['reviewThreads'] = [{'id': 't1', 'isResolved': False, 'isOutdated': True,
+                                 'viewerCanResolve': True, 'comments': {'nodes': [comment()]}}]
+        # Recorded before adding untrustedContext to comments/reviews.
+        fingerprints = {
+            'comments': 'fa375ea451962b768e7fee109be42c1e4a8b7aac82c8c554b9bc418c995a34cc',
+            'reviews': '951093d7ed87a7fa6b16dac8aa3bc4a8ce027c2b17f3f6db8b42ea912444514d',
+            'thread': '3eb8acac3d788121b381a6f33a4df4f31647ab57505ba657353b9d175a7e6649',
+        }
+        items = pf.items_from(data, ['reviewer'])
+        self.assertEqual({x['kind'] for x in items}, set(fingerprints))
+        for item in items:
+            with self.subTest(kind=item['kind']):
+                self.assertIs(item.get('untrustedContext'), True)
+                self.assertEqual(item['fingerprint'], fingerprints[item['kind']])
+
     def test_bot_login_variants_and_review_body_optout(self):
         data = snapshot('')
         data['comments'] = [comment(author='copilot-pull-request-reviewer')]
