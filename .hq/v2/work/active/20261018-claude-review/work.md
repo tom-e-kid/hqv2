@@ -1,6 +1,6 @@
 # Claude Code GitHub Actions による PR レビュー
 
-状態: 実装・設定中
+状態: Draft PR 作成済み・認証 Secret 登録待ち
 
 概要: HQ 自体の PR に独立した AI レビューを導入する。Plugin 利用先向けの pr-feedback と分離し、このリポジトリでレビューを投稿する workflow を追加する。
 
@@ -38,3 +38,9 @@ Actions は有効、リポジトリの admin 権限あり。repository secret �
 - この変更は HQ 開発用のレビュー workflow と運用文書のみで、配布 Plugin の動作を変えないため CHANGELOG の更新対象外とした。
 
 初期案は PR 作成・修正 push ごとのレビュー。起動タイミングについてユーザーの回答があれば反映する。サブスク認証の Secret が未登録のため、まず Draft PR として設定をレビュー可能な状態にする。Secret 登録後に通常 PR へ切り替えて実行を確認し、develop への反映後に通常運用を開始する。現時点では自動レビューが動作済み・導入完了とは扱わない。
+
+## PR と引き継ぎ
+
+[Draft PR #7](https://github.com/tom-e-kid/hqv2/pull/7) を `ci/claude-pr-review` から develop 向けに作成した（実装 commit: `38761c3`）。GitHub 上で Draft・base/head を確認し、workflow run `39092647882` が Draft のため skipped となることを確認した。これはレビュー実行・投稿の成功確認ではない。
+
+次はユーザーによる Secret 登録と起動タイミングの回答。その後、必要な設定を反映して通常 PR へ切り替え、レビュー実行・投稿を確認する。develop へ取り込むまではリポジトリ全体の自動レビュー導入完了とは扱わない。
