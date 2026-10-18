@@ -1,6 +1,6 @@
 # pr-feedback の計画と現在地
 
-状態: 実装・自動検証済み、PR 作成中（導入検証は今回の完了条件外）
+状態: PR 作成済み・レビュー待ち（導入検証は今回の完了条件外）
 
 概要: AI Reviewer の FB の待機・分類・修正・返信・Resolve・再確認を、利用先のオプトインで最大3回実行する。初版から Codex・Claude Code を対象とし、セッション終了後の常駐監視は含めない。
 
@@ -37,7 +37,7 @@
 - [x] 構造・参照・配布設定・自動テスト・Skill 専用検証を実施する。
 - [x] README に共通の前提・設定・開始・停止と、Codex/Claude Code のインストール・起動・Hook の差異を記載する。
 - [x] 後続の導入検証を今回の PR の完了条件から外す。
-- [ ] 最終の文書・差分検証、commit・push・develop 向け PR 作成を行う。
+- [x] 最終の文書・差分検証、commit・push・develop 向け PR 作成を行う。
 
 ## 後続作業（今回の PR の完了条件外）
 
@@ -50,7 +50,7 @@
 | 作業開始時 | Git status、develop と origin/develop の比較 | 未コミット変更なし、ローカル参照同士の差分0。作業開始時は remote 未取得。PR 準備時に origin/develop を fetch し、分岐元との差分0を確認 |
 | 計画の前提 | 既存構成・公式 Hook 文書の確認 | 非同期 Hook の再開条件に製品差がある。実機は未確認 |
 | 構造・参照 | `python3 scripts/validate.py` | 成功。共通 Skill 7件、ローカル参照104件を確認 |
-| 全変更ファイル | 一時 index・一時 object store による diff check と commit_security.py | 20ファイルで成功。実際の index は変更せず、例外追加なし |
+| 全変更ファイル | 最終ステージ内容への diff check と commit_security.py | 20ファイルで成功。Git Hook でも成功。例外追加なし |
 | 自動テスト | `python3 -m unittest discover -s tests -v` | 全体49件（既存23件、新規26件）。失敗時・再開・上限・二重投稿・再オープン・Hook 入出力を含む |
 | Skill 専用検証 | skill-creator の quick_validate.py | 一時仮想環境の PyYAML 6.0.3 で成功。システム Python は変更していない |
 | Claude Code 配布設定 | 2.1.302 の plugin validate（root・manifest） | 成功。既知のルート CLAUDE.md 警告のみ |
@@ -63,4 +63,6 @@
 
 作業ブランチは `feat/pr-feedback`、取り込み先は `develop`。Skill・Hook・補助スクリプト・自動テスト・利用者向け設定例と文書を実装し、CHANGELOG を更新した。このリポジトリの有効化設定は追加していない。
 
-実装・自動検証と利用先向けセットアップの文書化を完了した。最終の差分検証後に commit・push し、develop 向けの通常 PR を作成する。製品内の Hook 起動・継続、レビュー返信・Resolve・push は未検証であり、後続の導入検証として扱う。
+実装・自動検証と利用先向けセットアップの文書化を完了し、`751fdd7` を commit・push した。[PR #6](https://github.com/tom-e-kid/hqv2/pull/6) を develop 向けの通常 PR として作成し、base/head・本文・非 Draft 状態を API で確認した。
+
+現在はレビュー・取り込み待ち。製品内の Hook 起動・継続、レビュー返信・Resolve・push は未検証であり、後続の導入検証として扱う。今回の PR の完了・取り込み条件には含めない。
