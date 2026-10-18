@@ -2,7 +2,7 @@
 
 Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
 共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
-現在は次の六つの共通 Skill を収録しています。各 Skill は単独で使用できます。
+現在は次の七つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
 | Skill | 役割 |
 | --- | --- |
@@ -11,9 +11,10 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 | `git` | Git・GitHub の作業準備、検証を伴うコミット、PR 作成・取り込みを進める |
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
+| `pr-feedback` | AI Reviewer の指摘の待機・分類・修正・理由付き返信・Resolve と再確認を上限付きで行う |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
-[導入](#導入) · [基本の使い方](#基本の使い方) · [コミット前チェックの導入](#コミット前のセキュリティチェック) · [利用先の設定](#利用先プロジェクトの設定)
+[導入](#導入) · [基本の使い方](#基本の使い方) · [AI レビュー対応の設定](#ai-レビューへの自動対応) · [コミット前チェックの導入](#コミット前のセキュリティチェック) · [利用先の設定](#利用先プロジェクトの設定)
 
 ## 導入
 
@@ -39,6 +40,7 @@ $steering を使い、合意した大枠に沿って検索機能の改善を相�
 $gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 $git を使い、この変更を必要な検証の後にコミットしてください。
 $pr を使い、このブランチの変更を develop 向けの PR にまとめてください。
+$pr-feedback を使い、この PR の AI レビュー指摘に対応してください。
 $release を使い、今回の公開対象とバージョンを整理してリリース準備をしてください。
 ```
 
@@ -69,6 +71,7 @@ claude plugin install hq@hq-marketplace
 /hq:gotchas
 /hq:git
 /hq:pr
+/hq:pr-feedback
 /hq:release
 ```
 
@@ -100,6 +103,124 @@ docs/ の大枠が変わる場合は相談・合意して更新します。大�
 各 Skill は単独で使えます。steering から大枠を変更する場合も、その変更を相談して docs/ に反映でき、sdd の呼び出しは必須ではありません。広い方針の見直しには sdd が使えます。
 
 要求・設計はまとめて合意してから実装へ進みます。同じ範囲の合意を求め直さず、文書ごとの承認を標準にしません。相談・記録だけの依頼では実装へ進みません。
+
+## AI レビューへの自動対応
+
+`pr-feedback` は AI Reviewer の指摘をまとめて受け取り、必要な修正・検証・commit/push、理由付き返信、適切な Resolve と再確認を最大3回行います。**HQ のインストールと、利用先リポジトリでの有効化の両方が必要です。** 待機中はスクリプトだけを動かし、セッション終了後の常駐監視は行いません。
+
+以下の `<HQ_ROOT>` は `pr-feedback` を含む HQ の取得先、`<TARGET_REPO>` は利用先リポジトリの絶対パスへ置き換えます。すでに HQ を導入済みの場合も、この機能を含む版が読み込まれていることを確認してください。
+
+### 1. 利用先の前提を確認する（共通）
+
+- macOS または Linux で、Python 3.10 以上・Git・GitHub CLI (`gh`) を利用できること。エージェントと Hook の実行環境からも、これらのコマンドと認証情報を利用できる必要があります。
+- github.com のリポジトリで、`origin` がそのリポジトリを指していること。初版は同じリポジトリ内のブランチを対象とし、fork PR・GitHub Enterprise は対象外です。
+- Copilot や自前の AI Reviewer が、PR 作成後・必要なら修正 push 後に起動する設定になっていること。**HQ は AI Reviewer 自体の設定・起動を行いません。**
+
+利用先のルートで確認します。未認証なら `gh auth login --hostname github.com` を行い、対象 PR の読み取り・返信・Resolve とブランチへの push に必要な権限を用意します。
+
+```bash
+cd "<TARGET_REPO>"
+python3 --version
+git remote get-url origin
+gh auth status --hostname github.com
+```
+
+### 2. HQ を読み込む（製品別）
+
+#### Codex
+
+HQ のルートで Marketplace を登録し、Plugin をインストールします。[通常の導入手順](#codex)で導入済みなら、この操作は省略できます。
+
+```bash
+cd "<HQ_ROOT>"
+codex plugin marketplace add .
+codex plugin add hq@hq-marketplace
+```
+
+利用先で新しい Codex セッションを開きます。デスクトップの場合も、利用先リポジトリをプロジェクトとして開いて新しいチャットを開始します。
+
+```bash
+cd "<TARGET_REPO>"
+codex
+```
+
+Codex CLI の `/hooks` で HQ の Hook の内容を確認し、未信頼の定義を信頼します。**Plugin のインストールだけでは Hook は実行されません。** 定義が更新された場合も再確認が必要です。デスクトップで信頼確認を案内された場合は、その案内に従ってください。[公式の Hook 信頼手順](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+
+#### Claude Code
+
+利用先から HQ を指定して、新しいセッションを起動します。一時利用では Marketplace 登録は不要です。
+
+```bash
+cd "<TARGET_REPO>"
+claude --plugin-dir "<HQ_ROOT>"
+```
+
+毎回 `--plugin-dir` を指定しない運用では、HQ のルートで永続インストールしてから、利用先で `claude` を起動します。
+
+```bash
+cd "<HQ_ROOT>"
+claude plugin marketplace add .
+claude plugin install hq@hq-marketplace
+cd "<TARGET_REPO>"
+claude
+```
+
+`/hooks` で HQ の Hook が読み込まれていることを確認します。利用先の信頼・権限について確認が出た場合は内容を確認してください。すでに永続インストールした HQ がある場合は、一時読み込みと重ねず、使用する版と経路を一つに揃えます。[公式の Plugin 導入手順](https://code.claude.com/docs/en/discover-plugins)
+
+### 3. 利用先で有効化する（共通）
+
+**利用先リポジトリ**に `.hq/v2/pr-feedback.json` を作成します。すでに存在する場合は内容を確認して編集し、上書きしません。次は Copilot を対象に、修正・push・返信・Resolve を許可する例です。
+
+```json
+{
+  "version": 1,
+  "enabled": true,
+  "repository": "OWNER/REPOSITORY",
+  "reviewers": ["copilot-pull-request-reviewer"],
+  "ignoreReviewBodies": ["copilot-pull-request-reviewer"],
+  "maxRounds": 3,
+  "quietSeconds": 120,
+  "waitSeconds": 600,
+  "pollSeconds": 30,
+  "actions": {"fix": true, "push": true, "reply": true, "resolve": true}
+}
+```
+
+`repository` は利用先の `OWNER/REPOSITORY` に置き換えます。`reviewers` は GitHub GraphQL API が返す投稿アカウントの `login` です。Copilot は `copilot-pull-request-reviewer` を指定します。末尾の `[bot]` と大文字・小文字の違いは照合時に正規化します。`ignoreReviewBodies` は総評を対応対象から除く login です。省略時は Copilot の総評を除き、個別スレッドとレビュー完了の検出は維持します。本文にも指摘を載せるレビュアーでは除外しないでください。自前レビュアーや複数のレビュアーでは対象の login を配列に指定します。未設定・`enabled: false` のリポジトリでは監視しません。[無効状態の設定例](examples/project/.hq/v2/pr-feedback.json)も参照できます。
+
+同じチャットで、許可する操作を明示します。次の依頼文は両製品で使えます。
+
+```text
+このリポジトリで HQ の pr-feedback を有効にする。
+.hq/v2/pr-feedback.json の対象レビュアーについて、この PR の範囲内の修正・検証・
+コミット・push・理由付き返信・解決と判断できるスレッドの Resolve を許可する。
+判断・対応は最大3回。別 PR 候補は Issue 案まで作成し、起票前に確認して。
+```
+
+設定は Git 管理してリポジトリで共有できます。報告ファイルの保存先 `.hq/v2/.ignore/` は、既存の `.gitignore` に追加して管理対象外にします。Plugin Hook は Plugin から読み込むため、利用先への Hook ファイルのコピーや Git の `core.hooksPath` 設定は不要です。コミット前セキュリティチェックの導入は別の操作です。
+
+### 4. PR を作成して監視を開始する
+
+有効化したセッション内で、通常どおり PR を作成します。`gh pr create` など対応する作成経路の完了後に `HQ pr-feedback registered PR #...` の通知が出れば、監視が登録されています。**セッションを開いたまま**にしてください。ターン終了時の Hook がレビューを待ち、FB の対応または終了報告のために処理を継続します。
+
+既存 PR、ブラウザ・別ターミナルで作成した PR、登録通知が出ない経路では、対象のブランチを開いたセッションで明示的に依頼します。
+
+| 製品 | チャットでの依頼例 |
+| --- | --- |
+| Codex | `$pr-feedback を使って PR #123 の監視を登録し、AI レビューの指摘に対応して。` |
+| Claude Code | `/hq:pr-feedback PR #123 の監視を登録し、AI レビューの指摘に対応して。` |
+
+### 停止方法と製品差
+
+| 項目 | Codex | Claude Code |
+| --- | --- | --- |
+| Plugin の呼び出し | `$pr-feedback` | `/hq:pr-feedback` |
+| Hook 定義 | `hooks/codex.json`。定義ごとの信頼確認が必要 | `hooks/hooks.json`。Plugin 読み込み時に登録 |
+| 待機 | 同期 Stop Hook。既定は最大10分、待機中のモデル呼び出しなし | 同左 |
+| 中断 | Interrupt Hook が監視の中断を記録 | 中断後に監視をやめる場合は明示的な停止または無効化が必要 |
+| セッション終了 | 監視を停止。終了後の自動処理なし | 同左 |
+
+監視を停止する場合は、チャットで「この PR の pr-feedback の監視を停止して」と依頼します。以後の自動登録も無効にする場合は、利用先の設定を `enabled: false` に変更します。再開・手動コマンド・待機期限と Cap 到達時の扱いは [運用手順](docs/pr-feedback.md) を参照してください。
 
 ## コミット前のセキュリティチェック
 
@@ -160,7 +281,7 @@ PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.m
 
 Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/references/gotchas.md` に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先し、Skill ごとの旧保存先も勝手に移動・重複作成しません。
 
-`sdd`・`steering`・`git`・`pr`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
+`sdd`・`steering`・`git`・`pr`・`pr-feedback`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
 
 標準メモリは補助的な想起に任せ、共有する落とし穴の正本はプロジェクト内の記録とします。全文の複製や同期を必須にしません。調査経緯は個別の作業記録、恒久的なルールや正式な手順は AGENTS.md・開発文書に持たせます。Gotchas は合意済みの方針・要求を上書きするものとして扱いません。
 
@@ -249,7 +370,13 @@ skills/pr/
 skills/release/
   SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
   references/settings.md            リリースの設定と適用例
-hooks/hooks.json                    両製品の SessionStart Hook（導入状態の確認）
+skills/pr-feedback/
+  SKILL.md                          AI レビュー指摘への対応・再確認
+hooks/hooks.json                    Claude Code 用 Hook
+hooks/codex.json                    Codex 用 Hook（中断イベントを含む）
+hooks/pr_feedback.py                PR 作成検知・待機・処理継続
+scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
+docs/pr-feedback.md                 オプトインと運用・検証
 hooks/git/pre-commit                Git Hook の配布用雛形
 scripts/commit_security.py           コミット対象のセキュリティチェック
 scripts/setup_security.py            Git Hook の導入・更新・状態確認

@@ -6,6 +6,8 @@
 
 ### Added
 
+- 利用先ごとのオプトインで AI Reviewer の指摘を待機・分類・修正・返信・Resolve・再確認する `pr-feedback` Skill、最大3回のバッチ管理と Codex・Claude Code 向け Hook。
+
 - ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認と、Codex・Claude Code 向けの SessionStart Hook。
 
 - プロジェクトの大枠を相談し、要求・設計の基準を残す `sdd` Skill。
@@ -17,6 +19,8 @@
 - Codex・Claude Code 向けの共通 Plugin 構成と、利用先向けの規約・設定例。
 
 ### Changed
+
+- README に `pr-feedback` の利用先セットアップ手順を追加し、共通設定と Codex・Claude Code ごとの読み込み・Hook・開始・停止の差異を明記。
 
 - `git` Skill の worktree 命名規則と既存 checkout の再利用優先を撤廃し、作成・再利用と配置・命名を利用先の運用やツールに委ねる。他セッションの作業保全とローカル設定の引き継ぎは維持。開発用設定を限定して引き継ぐ原則と、Codex・Claude Code の `.worktreeinclude` およびセットアップ方法を README に追記。
 
