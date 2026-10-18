@@ -52,7 +52,13 @@ def handle(event, sleep=time.sleep, monotonic=time.monotonic):
         if len(numbers) != 1:
             return None
         number = int(numbers.pop())
-        monitor.register(number, session)
+        try:
+            monitor.register(number, session)
+        except (FeedbackError, OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired):
+            return {'hookSpecificOutput': {'hookEventName': kind, 'additionalContext':
+                    f'HQ pr-feedback registration failed for PR #{number}; monitoring is not verified. '
+                    'Inspect status and retry register manually. If this session already monitors another PR, '
+                    'stop that PR explicitly before registering a second one. Do not claim monitoring started.'}}
         return {'hookSpecificOutput': {'hookEventName': kind, 'additionalContext':
                 f'HQ pr-feedback registered PR #{number}. Session: {session}. '
                 'Review feedback monitoring will run before this turn ends. '

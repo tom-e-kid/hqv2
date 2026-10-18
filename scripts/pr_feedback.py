@@ -25,12 +25,17 @@ def run(argv, cwd=None, stdin=None, timeout=45):
     result = subprocess.run(argv, cwd=cwd, input=stdin, text=True, capture_output=True, timeout=timeout)
     if result.returncode:
         # Tool errors may include credentials or user content; do not echo raw stderr.
-        raise FeedbackError(f"{argv[0]} failed (exit {result.returncode}); check authentication, permissions and connectivity")
+        hint = 'check authentication, permissions and connectivity' if argv[0] == 'gh' else 'check the local Git repository and command preconditions'
+        raise FeedbackError(f"{argv[0]} failed (exit {result.returncode}); {hint}")
     return result.stdout.strip()
 
 
 def digest(value):
     return hashlib.sha256(json.dumps(value, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
+
+
+def login(value):
+    return re.sub(r'\[bot\]$', '', value.lower())
 
 
 def load_config(root):
@@ -47,8 +52,11 @@ def load_config(root):
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', config.get('repository', '')):
         raise FeedbackError('pr-feedback.json: repository must be owner/name')
     reviewers = config.get('reviewers')
-    if not isinstance(reviewers, list) or not reviewers or any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9_\[\]-]+', x) for x in reviewers):
+    if not isinstance(reviewers, list) or not reviewers or any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(?:\[bot\])?', x) for x in reviewers):
         raise FeedbackError('pr-feedback.json: reviewers must be a nonempty list of exact account logins')
+    ignored = config.setdefault('ignoreReviewBodies', ['copilot-pull-request-reviewer'])
+    if not isinstance(ignored, list) or any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(?:\[bot\])?', x) for x in ignored):
+        raise FeedbackError('pr-feedback.json: ignoreReviewBodies must be a list of account logins')
     for key, default, low, high in [('maxRounds', 3, 1, 3), ('quietSeconds', 120, 0, 300), ('waitSeconds', 600, 1, 600), ('pollSeconds', 30, 1, 120)]:
         value = config.setdefault(key, default)
         if type(value) is not int or not low <= value <= high:
@@ -95,7 +103,7 @@ class GitHub:
         selections = {
             'comments': 'id databaseId body updatedAt url author { login }',
             'reviews': 'id body submittedAt state url commit { oid } author { login }',
-            'reviewThreads': 'id isResolved isOutdated viewerCanResolve comments(first:100) { nodes { id databaseId body updatedAt url author { login } } pageInfo { hasNextPage endCursor } }',
+            'reviewThreads': 'id isResolved isOutdated viewerCanResolve comments(first:100) { nodes { id databaseId body updatedAt url authorAssociation author { login } } pageInfo { hasNextPage endCursor } }',
         }
         for field, selection in selections.items():
             cursor = None
@@ -119,33 +127,40 @@ class GitHub:
             while connection['pageInfo']['hasNextPage']:
                 connection = self.graphql('''query($id:ID!,$cursor:String) {
                   node(id:$id) { ... on PullRequestReviewThread { comments(first:100,after:$cursor) {
-                    nodes { id databaseId body updatedAt url author { login } } pageInfo { hasNextPage endCursor }
+                    nodes { id databaseId body updatedAt url authorAssociation author { login } } pageInfo { hasNextPage endCursor }
                   } } }
                 }''', id=thread['id'], cursor=connection['pageInfo']['endCursor'])['node']['comments']
                 thread['comments']['nodes'].extend(connection['nodes'])
         return collections
 
 
-def items_from(snapshot, reviewers):
-    allowed = {x.lower() for x in reviewers}
+def items_from(snapshot, reviewers, ignore_review_bodies=('copilot-pull-request-reviewer',)):
+    allowed = {login(x) for x in reviewers}
+    ignored = {login(x) for x in ignore_review_bodies}
     items = []
     for kind in ('comments', 'reviews', 'reviewThreads'):
         for node in snapshot[kind]:
             if kind == 'reviewThreads':
                 comments = node['comments']['nodes']
-                if node['isResolved'] or not comments or (comments[0].get('author') or {}).get('login', '').lower() not in allowed:
+                if node['isResolved'] or not comments or login((comments[0].get('author') or {}).get('login', '')) not in allowed:
                     continue
-                # Own marked replies do not create a fresh batch. Human follow-ups do.
+                # All bodies remain untrusted input, including collaborator replies.
                 content = [c for c in comments if not ((c.get('author') or {}).get('login') == snapshot.get('viewer') and '<!-- hq-pr-feedback:' in c['body'])]
                 item = {'id': node['id'], 'kind': 'thread', 'url': comments[0]['url'], 'comments': content,
                         'replyTo': comments[0]['databaseId'], 'canResolve': node['viewerCanResolve'], 'outdated': node['isOutdated']}
             else:
-                if not node['body'].strip() or (node.get('author') or {}).get('login', '').lower() not in allowed:
+                author = login((node.get('author') or {}).get('login', ''))
+                if not node['body'].strip() or author not in allowed or (kind == 'reviews' and author in ignored):
                     continue
                 item = dict(node, kind=kind)
             # A pushed fix can change diff placement and permission metadata while
             # the actual discussion stays unchanged. Keep those out of identity.
             item['fingerprint'] = digest({key: value for key, value in item.items() if key not in ('outdated', 'canResolve')})
+            if kind == 'reviewThreads':
+                trigger = [c for c in content if login((c.get('author') or {}).get('login', '')) in allowed
+                           or c.get('authorAssociation') in ('OWNER', 'MEMBER', 'COLLABORATOR')]
+                item['triggerFingerprint'] = digest(trigger)
+                item['untrustedContext'] = True
             items.append(item)
     return items
 
@@ -191,11 +206,14 @@ class Monitor:
         return self.store / f'session-{digest(session)}.json'
 
     def current_branch(self):
-        return run(['git', 'symbolic-ref', '--short', 'HEAD'], self.root)
+        branch = run(['git', 'branch', '--show-current'], self.root)
+        if not branch:
+            raise FeedbackError('Detached HEAD; check out the PR head branch before registering or processing feedback')
+        return branch
 
     def check_pr(self, number):
         remote = run(['git', 'remote', 'get-url', 'origin'], self.root)
-        match = re.fullmatch(r'(?:git@github\.com:|https://github\.com/)([^/]+/[^/]+?)(?:\.git)?', remote)
+        match = re.fullmatch(r'(?:git@github\.com:|https://github\.com/|ssh://git@github\.com/)([^/]+/[^/]+?)(?:\.git)?/?', remote)
         if not match or match[1].lower() != self.config['repository'].lower():
             raise FeedbackError('origin must identify the configured github.com repository')
         pr = self.github.pr(number)
@@ -206,6 +224,17 @@ class Monitor:
         return pr
 
     def register(self, number, session, pushed_head=None):
+        with self.lock('session-' + digest(session)):
+            binding = self.session_path(session)
+            if binding.exists():
+                previous = json.loads(binding.read_text())['number']
+                if previous != number and self.path(previous).exists():
+                    previous_state = self.read(previous)
+                    if previous_state['session'] == session and previous_state['status'] != 'ended':
+                        raise FeedbackError(f'Session already monitors PR #{previous}; stop it explicitly before registering another PR')
+            return self._register(number, session, pushed_head)
+
+    def _register(self, number, session, pushed_head=None):
         with self.lock(number):
             pr = self.check_pr(number)
             verified_push = bool(pushed_head and self.config['actions']['push'] and pr['head'] == pushed_head
@@ -237,6 +266,41 @@ class Monitor:
             self.session_path(session).write_text(json.dumps({'number': number}))
             return state
 
+    def items(self, snapshot):
+        return items_from(snapshot, self.config['reviewers'], self.config['ignoreReviewBodies'])
+
+    def refresh(self, number, session, pushed_head=None):
+        """Reconcile an interrupted batch without consuming or resetting a round."""
+        with self.lock(number):
+            state = self.owned(number, session)
+            if state['status'] != 'batch':
+                raise FeedbackError('No active batch; register a stopped batch before refreshing')
+            pr = self.check_pr(number)
+            if pushed_head:
+                if not self.config['actions']['push'] or pr['head'] != pushed_head or run(['git', 'rev-parse', 'HEAD'], self.root) != pushed_head:
+                    raise FeedbackError('Refresh pushed head must match local HEAD and PR head, with push permitted')
+            elif pr['head'] != state['head']:
+                raise FeedbackError('Head changed; supply the verified pushed head')
+            snapshot = self.github.snapshot(number)
+            if self.github.pr(number)['head'] != pr['head']:
+                raise FeedbackError('Head changed while refreshing feedback')
+            current = {x['id']: x for x in self.items(snapshot)}
+            resolved = {x['id'] for x in snapshot['reviewThreads'] if x['isResolved']}
+            batch = []
+            for old in state['batch']:
+                if old['id'] in current:
+                    latest = current[old['id']]
+                    if old.get('requiresReevaluation') or old.get('superseded') or old['fingerprint'] != latest['fingerprint']:
+                        latest['requiresReevaluation'] = True
+                    batch.append(latest)
+                else:
+                    batch.append(dict(old, superseded='resolved' if old['id'] in resolved else 'no-longer-present'))
+            if batch != state['batch']:
+                state.setdefault('batchRefreshes', []).append({'round': state['rounds'], 'items': state['batch']})
+            state['batch'] = batch
+            self.save(state)
+            return state
+
     def owned(self, number, session):
         state = self.read(number)
         if state['session'] != session or state['worktree'] != str(self.root):
@@ -258,20 +322,20 @@ class Monitor:
             # Guard against a push during paginated reads.
             if self.github.pr(number)['head'] != state['head']:
                 raise FeedbackError('Head changed while collecting feedback')
-            items = items_from(snapshot, self.config['reviewers'])
+            items = self.items(snapshot)
             resolved = {x['id'] for x in snapshot['reviewThreads'] if x['isResolved']}
             for reopened in set(state.get('resolvedThreads', [])) - resolved:
                 state['processed'].pop(reopened, None)
             state['resolvedThreads'] = sorted(resolved)
-            pending = [x for x in items if state['processed'].get(x['id']) != x['fingerprint']]
-            observed = digest([(x['id'], x['fingerprint']) for x in pending])
+            pending = [x for x in items if state['processed'].get(x['id']) != x.get('triggerFingerprint', x['fingerprint'])]
+            observed = digest([(x['id'], x.get('triggerFingerprint', x['fingerprint'])) for x in pending])
             if state['observed'] != observed:
                 state.update(observed=observed, lastChange=now)
             quiet = now - state['lastChange'] >= self.config['quietSeconds']
             # A submitted review for this head establishes completion only for its author.
-            completed = {(x.get('author') or {}).get('login', '').lower() for x in snapshot['reviews']
+            completed = {login((x.get('author') or {}).get('login', '')) for x in snapshot['reviews']
                          if (x.get('commit') or {}).get('oid') == state['head'] and x['state'] in ('COMMENTED', 'APPROVED', 'CHANGES_REQUESTED')}
-            all_done = {x.lower() for x in self.config['reviewers']} <= completed
+            all_done = {login(x) for x in self.config['reviewers']} <= completed
             expired = now >= state['deadline']
             if pending and quiet and (all_done or expired):
                 if state['rounds'] >= self.config['maxRounds']:
@@ -293,11 +357,17 @@ class Monitor:
             if not isinstance(report, list) or {x.get('id') for x in report} != {x['id'] for x in state['batch']} or len(report) != len(state['batch']):
                 raise FeedbackError('Report must cover each batch item exactly once')
             for item in report:
+                source = next(x for x in state['batch'] if x['id'] == item['id'])
+                if source.get('superseded'):
+                    if item.get('decision') != 'superseded' or item.get('reason') != source['superseded'] or item.get('resolve'):
+                        raise FeedbackError('Superseded item must record the refresh result without Resolve')
+                    continue
+                if source.get('requiresReevaluation') and item.get('fingerprint') != source['fingerprint']:
+                    raise FeedbackError('Refreshed item requires the latest fingerprint after re-evaluation')
                 if item.get('decision') not in ('fix', 'defer', 'skip', 'hold') or not isinstance(item.get('reason'), str) or not item['reason'].strip():
                     raise FeedbackError('Each report item needs decision and reason')
                 if not item.get('replyUrl'):
                     raise FeedbackError('Each item needs a verified reply URL; retry incomplete operations or stop')
-                source = next(x for x in state['batch'] if x['id'] == item['id'])
                 operation = state.get('operations', {}).get(digest([source['id'], source['fingerprint'], state['rounds']]), {})
                 if (operation.get('replyUrl'), operation.get('decision'), operation.get('reason')) != (item['replyUrl'], item['decision'], item['reason']):
                     raise FeedbackError('Reply result must match a recorded respond operation')
@@ -309,9 +379,17 @@ class Monitor:
                     raise FeedbackError('pushed head must match local HEAD and PR head')
             elif pr['head'] != state['head']:
                 raise FeedbackError('Head changed; supply the verified pushed head')
+            if any(x.get('superseded') for x in state['batch']):
+                current = {x['id'] for x in self.items(self.github.snapshot(number))}
+                if any(x.get('superseded') and x['id'] in current for x in state['batch']):
+                    raise FeedbackError('Superseded feedback reappeared; refresh and re-evaluate')
+                if self.github.pr(number)['head'] != pr['head']:
+                    raise FeedbackError('Head changed while verifying superseded feedback')
             state.setdefault('reports', []).append({'round': state['rounds'], 'items': report, 'head': pr['head']})
-            state['resolvedThreads'] = sorted(set(state.get('resolvedThreads', [])) | {x['id'] for x in report if x.get('resolved')})
-            state['processed'].update({x['id']: x['fingerprint'] for x in state['batch']})
+            state['resolvedThreads'] = sorted(set(state.get('resolvedThreads', []))
+                                             | {x['id'] for x in report if x.get('resolved')}
+                                             | {x['id'] for x in state['batch'] if x.get('superseded') == 'resolved'})
+            state['processed'].update({x['id']: x.get('triggerFingerprint', x['fingerprint']) for x in state['batch'] if not x.get('superseded')})
             state.update(status='waiting', head=pr['head'], batch=None, observed=None, deadline=time.time() + self.config['waitSeconds'], lastChange=time.time())
             self.save(state)
             return state
@@ -328,6 +406,13 @@ class Monitor:
             if not isinstance(report, list) or len(report) != len(batch) or {x.get('id') for x in report} != set(batch):
                 raise FeedbackError('Report must cover each batch item exactly once')
             for entry in report:
+                source = batch[entry['id']]
+                if source.get('superseded'):
+                    if entry.get('decision') != 'superseded' or entry.get('reason') != source['superseded'] or entry.get('resolve'):
+                        raise FeedbackError('Superseded item must record the refresh result without Resolve')
+                    continue
+                if source.get('requiresReevaluation') and entry.get('fingerprint') != source['fingerprint']:
+                    raise FeedbackError('Refreshed item requires the latest fingerprint after re-evaluation')
                 if entry.get('decision') not in ('fix', 'defer', 'skip', 'hold') or not isinstance(entry.get('reason'), str) or not entry['reason'].strip():
                     raise FeedbackError('Each report item needs decision and reason')
                 if entry.get('resolve') and (entry['decision'] not in ('fix', 'skip') or not self.config['actions']['resolve']):
@@ -343,26 +428,32 @@ class Monitor:
             snapshot = self.github.snapshot(number)
             viewer = snapshot['viewer']
             comments = snapshot['comments'] + [c for t in snapshot['reviewThreads'] for c in t['comments']['nodes']]
-            current = {x['id']: x for x in items_from(snapshot, self.config['reviewers'])}
+            current = {x['id']: x for x in self.items(snapshot)}
             threads = {t['id']: t for t in snapshot['reviewThreads']}
             # Check the whole plan before its first write, including changed human replies.
             for entry in report:
                 item = batch[entry['id']]
+                if item.get('superseded'):
+                    if item['id'] in current:
+                        raise FeedbackError('Superseded feedback reappeared; refresh and re-evaluate')
+                    continue
                 key = digest([item['id'], item['fingerprint'], state['rounds']])
                 already_resolved = (entry.get('resolve') and threads.get(entry['id'], {}).get('isResolved')
                                     and state.get('operations', {}).get(key, {}).get('replyUrl'))
                 if not already_resolved and (entry['id'] not in current or current[entry['id']]['fingerprint'] != item['fingerprint']):
-                    raise FeedbackError('Feedback changed or was resolved; re-evaluate before replying')
+                    raise FeedbackError('Feedback changed or was resolved; use refresh and re-evaluate before replying')
                 if entry.get('resolve'):
                     thread = threads.get(entry['id'])
                     if not thread or (not thread['isResolved'] and not thread['viewerCanResolve']):
                         raise FeedbackError('Item is not a resolvable review thread')
-                    authors = {(c.get('author') or {}).get('login', '').lower() for c in thread['comments']['nodes']}
-                    if authors - {viewer.lower(), *(x.lower() for x in self.config['reviewers'])}:
+                    authors = {login((c.get('author') or {}).get('login', '')) for c in thread['comments']['nodes']}
+                    if authors - {login(viewer), *(login(x) for x in self.config['reviewers'])}:
                         raise FeedbackError('Human/unknown follow-up prevents automatic Resolve')
             operations = state.setdefault('operations', {})
             for entry in report:
                 item = batch[entry['id']]
+                if item.get('superseded'):
+                    continue
                 key = digest([item['id'], item['fingerprint'], state['rounds']])
                 marker = f'<!-- hq-pr-feedback:{key} -->'
                 operation = operations.setdefault(key, {})
@@ -394,7 +485,7 @@ class Monitor:
                     if self.github.pr(number)['head'] != pr['head']:
                         raise FeedbackError('Head changed before Resolve')
                     fresh = self.github.snapshot(number)
-                    latest = {x['id']: x for x in items_from(fresh, self.config['reviewers'])}
+                    latest = {x['id']: x for x in self.items(fresh)}
                     if item['id'] not in latest or latest[item['id']]['fingerprint'] != item['fingerprint']:
                         raise FeedbackError('Thread changed before Resolve; inspect it before retrying')
                     self.github.graphql('mutation($id:ID!) { resolveReviewThread(input:{threadId:$id}) { thread { isResolved } } }', id=item['id'])
@@ -414,7 +505,7 @@ class Monitor:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['register', 'poll', 'status', 'respond', 'finish', 'stop'])
+    parser.add_argument('command', choices=['register', 'poll', 'status', 'refresh', 'respond', 'finish', 'stop'])
     parser.add_argument('--repo', default='.')
     parser.add_argument('--pr', type=int, required=True)
     parser.add_argument('--session', required=True)
@@ -436,9 +527,11 @@ def main():
         result = monitor.owned(args.pr, args.session)
     elif args.command == 'stop':
         result = monitor.stop(args.pr, args.session, args.reason)
+    elif args.command == 'refresh':
+        result = monitor.refresh(args.pr, args.session, args.pushed_head)
     else:
         if not args.report:
-            raise FeedbackError('finish requires --report')
+            raise FeedbackError(f'{args.command} requires --report')
         report = json.loads(args.report.read_text())
         if args.command == 'respond':
             result = monitor.respond(args.pr, args.session, report, args.pushed_head)

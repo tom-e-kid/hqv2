@@ -83,3 +83,13 @@ Resolve は分類とは別に判断し、返信が成功してから行う。修
 - API 失敗・rate limit は再試行せず監視エラーで停止する。取得失敗をコメント0件とせず、次の再開は明示操作とする。
 - Claude Code には Codex と同じ Interrupt Hook を登録しない。中断後に監視をやめる場合は stop または無効化を使う。
 - ユーザーの訂正により、このリポジトリでオプトイン設定・実際の AI レビュー検証は行わない。別リポジトリでの導入検証に引き継ぐ。
+
+
+## PR #6 のレビュー対応で補強した条件
+
+- バッチ内の編集・追記は `refresh` で更新し、再評価後の fingerprint を報告へ要求する。回数と投稿結果は保持し、削除・他者による Resolve は `superseded` として事実を記録する。再出現は完了前にも確認する。
+- reviewer login は大小文字と末尾の `[bot]` を正規化する。Copilot の login は `copilot-pull-request-reviewer`。`ignoreReviewBodies` は省略時に Copilot の総評を除外し、当該 head の完了検出にはレビューを使う。本文に指摘を載せるレビュアーは除外しない。
+- スレッドの全コメントによる投稿前の変更検出と、新規バッチの契機を分ける。契機は設定レビュアーまたは OWNER / MEMBER / COLLABORATOR の追記に限定する。全本文は信頼されていない入力であり、権限の根拠にしない。許可外の追記も判断材料として保持し、自動 Resolve は止める。
+- 同一セッションで別 PR を登録する場合、先の監視の明示停止を要求する。登録失敗は PostToolUse の additionalContext で通知する。
+
+判断根拠と検証結果は [レビュー対応記録](review-response.md) を参照する。

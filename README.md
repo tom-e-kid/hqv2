@@ -176,7 +176,8 @@ claude
   "version": 1,
   "enabled": true,
   "repository": "OWNER/REPOSITORY",
-  "reviewers": ["Copilot"],
+  "reviewers": ["copilot-pull-request-reviewer"],
+  "ignoreReviewBodies": ["copilot-pull-request-reviewer"],
   "maxRounds": 3,
   "quietSeconds": 120,
   "waitSeconds": 600,
@@ -185,7 +186,7 @@ claude
 }
 ```
 
-`repository` は利用先の `OWNER/REPOSITORY` に置き換えます。`reviewers` は GitHub API が返す実際の投稿アカウントの `login` です。表示名ではありません。自前レビュアーや複数のレビュアーでは対象の login を配列に指定します。未設定・`enabled: false` のリポジトリでは監視しません。[無効状態の設定例](examples/project/.hq/v2/pr-feedback.json)も参照できます。
+`repository` は利用先の `OWNER/REPOSITORY` に置き換えます。`reviewers` は GitHub GraphQL API が返す投稿アカウントの `login` です。Copilot は `copilot-pull-request-reviewer` を指定します。末尾の `[bot]` と大文字・小文字の違いは照合時に正規化します。`ignoreReviewBodies` は総評を対応対象から除く login です。省略時は Copilot の総評を除き、個別スレッドとレビュー完了の検出は維持します。本文にも指摘を載せるレビュアーでは除外しないでください。自前レビュアーや複数のレビュアーでは対象の login を配列に指定します。未設定・`enabled: false` のリポジトリでは監視しません。[無効状態の設定例](examples/project/.hq/v2/pr-feedback.json)も参照できます。
 
 同じチャットで、許可する操作を明示します。次の依頼文は両製品で使えます。
 
