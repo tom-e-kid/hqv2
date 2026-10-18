@@ -37,7 +37,7 @@
 - 新しい作業ブランチは `<type>/<short-description>` とする。type は Conventional Commits と揃え、説明は英小文字・数字・ハイフンで簡潔に書く。例: `feat/add-notifications`。作成したツール名を示す接頭辞は付けない。
 - コミットのタイトルは Conventional Commits に従う簡潔な一行とする。必要な理由は本文に残してよい。
 - 作業ブランチからベースブランチへの PR を原則とする。省略はプロジェクトの許可条件または今回の明示的な指示に基づき、必要な検証を省略しない。
-- worktree を新設するときは `<repo>@<branch>` を基本とし、ブランチ名の `/` を `-` に置換する。既存環境や作成ツールの制約を尊重する。名前から worktree やルートを判定しない。
+- worktree の作成・再利用、配置・命名は作業と利用環境に合わせて選ぶ。他の作業やセッションが使う checkout と未コミット変更を保全し、対象は Git の情報で確認する。
 - 必須検証と PR 省略条件は [.hq/v2/git.md](.hq/v2/git.md) に記載する。実在しないコマンドを作らず、未実施の検証を成功扱いしない。
 - 共有する既定ベースなどは [.hq/v2/settings.json](.hq/v2/settings.json)、checkout／worktree 固有の指定は Git 管理対象外の `.hq/v2/.ignore/settings.json` に置く。既定値と進行中の作業の取り込み先を区別する。
 

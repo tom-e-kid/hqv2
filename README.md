@@ -144,7 +144,7 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 新しい作業記録は `.hq/v2/work/active/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
 
-Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。新規 worktree の名前は `<repo>@<branch>` を基本とし、ブランチ名の `/` は `-` に置換します。`@` の有無で worktree を判定せず、既存環境・作成ツールの制約を尊重します。
+Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree の作成・再利用、配置・命名は利用先の運用やツールに合わせて選び、ブランチとの一対一対応は求めません。対象は Git の情報で確認し、他の作業やセッションが使う checkout と未コミット変更を保全します。
 
 利用先の AGENTS.md には適用方針と参照先を残し、検証・PR 省略条件は [.hq/v2/git.md の例](examples/project/.hq/v2/git.md) を既存文書へ統合します。lint・型チェック・クリーンビルド・単体テストなどを一律に必須とせず、プロジェクトごとに適用条件と実在するコマンドを定めます。環境・テスト・配布ツールという分類だけで PR を省略しません。
 
