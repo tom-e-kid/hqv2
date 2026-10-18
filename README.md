@@ -183,6 +183,10 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
 Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
 
+### このリポジトリの PR レビュー
+
+HQ 自体の PR には Claude Code GitHub Actions による日本語レビューを設定しています。Claude サブスクの `CLAUDE_CODE_OAUTH_TOKEN` を repository secret に登録して利用します。対象・起動タイミング・手動再レビュー・停止は [運用手順](docs/claude-review.md) を参照してください。マージ必須チェックにはせず、Plugin 利用先への workflow の導入や pr-feedback による自動修正も行いません。
+
 ## 構成
 
 現在の構成です。
