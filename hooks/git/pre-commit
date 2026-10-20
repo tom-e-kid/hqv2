@@ -1,5 +1,6 @@
 #!/bin/sh
-# HQ commit security Git hook v1; managed by scripts/setup_security.py.
+# HQ commit security Git hook v2; managed by scripts/setup_security.py.
+# Repository-owned steps in <hook>.d/ run first; the scan runs last on the index they leave.
 set -eu
 hq_git_common_dir=$(git rev-parse --git-common-dir)
 if ! command -v python3 >/dev/null 2>&1; then
@@ -9,5 +10,23 @@ fi
 if [ ! -f "$hq_git_common_dir/hq-commit-security/check.py" ]; then
   echo 'BLOCKED: HQ commit security scanner is missing; restore the installation' >&2
   exit 1
+fi
+hq_steps="$0.d"
+if [ -d "$hq_steps" ]; then
+  for hq_step in "$hq_steps"/*; do
+    # An unmatched glob stays literal; a broken link must still be reported, not skipped.
+    if [ ! -e "$hq_step" ] && [ ! -L "$hq_step" ]; then
+      continue
+    fi
+    hq_step_name="${hq_steps##*/}/${hq_step##*/}"
+    if [ ! -f "$hq_step" ] || [ ! -x "$hq_step" ]; then
+      echo "BLOCKED: $hq_step_name is not an executable file" >&2
+      exit 1
+    fi
+    if ! "$hq_step" "$@"; then
+      echo "BLOCKED: $hq_step_name failed" >&2
+      exit 1
+    fi
+  done
 fi
 exec python3 "$hq_git_common_dir/hq-commit-security/check.py"

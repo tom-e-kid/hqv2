@@ -14,6 +14,22 @@ ROOT = Path(__file__).resolve().parents[1]
 CHECK = ROOT / "scripts/commit_security.py"
 SETUP = ROOT / "scripts/setup_security.py"
 STATUS_HOOK = ROOT / "hooks/security_status.py"
+HOOK_NAMES = ("pre-commit", "pre-merge-commit", "pre-applypatch")
+# The v1 template as installed before <hook>.d steps existed; update must recognize it exactly.
+V1_HOOK = """#!/bin/sh
+# HQ commit security Git hook v1; managed by scripts/setup_security.py.
+set -eu
+hq_git_common_dir=$(git rev-parse --git-common-dir)
+if ! command -v python3 >/dev/null 2>&1; then
+  echo 'BLOCKED: Python 3 is required for HQ commit security' >&2
+  exit 1
+fi
+if [ ! -f "$hq_git_common_dir/hq-commit-security/check.py" ]; then
+  echo 'BLOCKED: HQ commit security scanner is missing; restore the installation' >&2
+  exit 1
+fi
+exec python3 "$hq_git_common_dir/hq-commit-security/check.py"
+"""
 
 
 class SecurityTests(unittest.TestCase):
@@ -56,6 +72,13 @@ class SecurityTests(unittest.TestCase):
 
     def setup_hook(self, action="install"):
         return self.run_command([sys.executable, str(SETUP), action])
+
+    def add_step(self, name, script, hook="pre-commit"):
+        path = self.repo / ".git/hooks" / f"{hook}.d" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("#!/bin/sh\nset -eu\n" + script)
+        path.chmod(0o755)
+        return path
 
     def assert_blocked(self, result, rule, secret=None):
         self.assertEqual(result.returncode, 1, result.stderr)
@@ -328,6 +351,94 @@ class SecurityTests(unittest.TestCase):
         self.assertEqual(self.setup_hook("uninstall").returncode, 2)
         self.assertEqual(hook.read_bytes(), original)
         self.assertTrue((self.repo / ".git/hq-commit-security/check.py").is_file())
+
+    def test_steps_run_in_order_before_scan_of_resulting_index(self):
+        self.stage("safe.txt", "safe\n")
+        self.git("commit", "-qm", "fixture")
+        self.assertEqual(self.setup_hook().returncode, 0)
+        log = Path(self.tmp.name) / "steps.log"
+        self.add_step("20-second", f'echo second >> "{log}"\n')
+        self.add_step("10-first", f'echo first >> "{log}"\n')
+        self.stage("safe.txt", "changed\n")
+        self.git("commit", "-qm", "steps pass")
+        self.assertEqual(log.read_text(), "first\nsecond\n")
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "ready")
+        # A step may change the index; the scan must see that index, including Git's alternate ones.
+        self.add_step("30-stage-env", "printf 'APP_MODE=production\\n' > .env\ngit add .env\n")
+        for args in ((), ("-a",), ("--only", "safe.txt")):
+            self.write("safe.txt", f"change {args}\n")
+            if not args:
+                self.git("add", "safe.txt")
+            result = self.run_command(["git", "commit", "-qm", "blocked", *args])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("env-file", result.stderr)
+            self.git("rm", "-q", "--cached", "--ignore-unmatch", ".env")
+
+    def test_failing_or_unrunnable_step_blocks_commit(self):
+        self.assertEqual(self.setup_hook().returncode, 0)
+        self.stage("safe.txt", "safe\n")
+        step = self.add_step("10-fail", "echo step-message >&2\nexit 3\n")
+        result = self.run_command(["git", "commit", "-qm", "blocked"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("step-message", result.stderr)
+        self.assertIn("BLOCKED: pre-commit.d/10-fail failed", result.stderr)
+        step.chmod(0o644)
+        result = self.run_command(["git", "commit", "-qm", "blocked"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("BLOCKED: pre-commit.d/10-fail is not an executable file", result.stderr)
+        step.unlink()
+        broken = step.parent / "10-link"
+        broken.symlink_to(step.parent / "missing")
+        result = self.run_command(["git", "commit", "-qm", "blocked"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("BLOCKED: pre-commit.d/10-link is not an executable file", result.stderr)
+        self.assertNotEqual(self.run_command(["git", "rev-parse", "--verify", "HEAD"]).returncode, 0)
+        broken.unlink()
+        (step.parent / ".DS_Store").write_text("ignored\n")
+        self.git("commit", "-qm", "passes")
+
+    def test_steps_for_merge_commits(self):
+        self.stage("safe.txt", "safe\n")
+        self.git("commit", "-qm", "fixture")
+        self.git("switch", "-qc", "side")
+        self.stage("side.txt", "side\n")
+        self.git("commit", "-qm", "side")
+        self.git("switch", "-q", "-")
+        original = self.git("rev-parse", "HEAD").strip()
+        self.assertEqual(self.setup_hook().returncode, 0)
+        self.add_step("10-fail", "exit 1\n", hook="pre-merge-commit")
+        result = self.run_command(["git", "merge", "--no-ff", "--no-edit", "side"])
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("BLOCKED: pre-merge-commit.d/10-fail failed", result.stderr)
+        self.assertEqual(self.git("rev-parse", "HEAD").strip(), original)
+
+    def test_update_replaces_only_previous_hq_hooks(self):
+        self.assertEqual(self.setup_hook().returncode, 0)
+        hooks = self.repo / ".git/hooks"
+        current = (hooks / "pre-commit").read_bytes()
+        for name in HOOK_NAMES:
+            (hooks / name).write_text(V1_HOOK)
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "update-available")
+        self.assertEqual(self.setup_hook("update").returncode, 0)
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "ready")
+        for name in HOOK_NAMES:
+            self.assertEqual((hooks / name).read_bytes(), current)
+        # A hand-edited hook is neither replaced nor accepted.
+        edited = hooks / "pre-applypatch"
+        edited.write_text(V1_HOOK + "# local edit\n")
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "hook-missing-or-modified")
+        self.assertEqual(self.setup_hook("update").returncode, 0)
+        self.assertTrue(edited.read_text().endswith("# local edit\n"))
+        self.assertEqual(self.setup_hook("uninstall").returncode, 2)
+        # Exact previous copies can be removed; repository-owned steps are kept.
+        edited.write_text(V1_HOOK)
+        step = self.add_step("10-keep", "exit 0\n")
+        result = self.setup_hook("uninstall")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Kept pre-commit.d/", result.stdout)
+        self.assertTrue(step.is_file())
+        for name in HOOK_NAMES:
+            self.assertFalse((hooks / name).exists())
 
     def test_session_hook_is_read_only_and_quiet_when_ready(self):
         event = json.dumps({"hook_event_name": "SessionStart", "cwd": str(self.repo)})

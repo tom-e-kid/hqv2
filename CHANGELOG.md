@@ -8,7 +8,7 @@
 
 - 利用先ごとのオプトインで AI Reviewer の指摘を待機・分類・修正・返信・Resolve・再確認する `pr-feedback` Skill、最大3回のバッチ管理と Codex・Claude Code 向け Hook。
 
-- ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認と、Codex・Claude Code 向けの SessionStart Hook。
+- ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認、チェックの前に利用先の処理（整形など）を走らせる `<Hook 名>.d/` と、Codex・Claude Code 向けの SessionStart Hook。
 
 - プロジェクトの大枠を相談し、要求・設計の基準を残す `sdd` Skill。
 - 具体的な作業を相談・実装・検証し、記録から再開する `steering` Skill。
