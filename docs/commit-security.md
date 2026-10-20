@@ -19,7 +19,7 @@ python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 
 スクリプトは Git の共通管理ディレクトリ内の `hq-commit-security/check.py` へコピーし、標準の `hooks/pre-commit`・`hooks/pre-merge-commit`・`hooks/pre-applypatch` に同じ呼び出しを設置します。通常のコミット、ローカルの自動マージコミット、`git am` のパッチ適用後のコミットを対象にします。グローバル設定と `core.hooksPath` は変更しません。コピーは Git 管理対象にならず、Plugin の移動・アンインストール後も残ります。clone 先では再導入が必要です。同じ Git 共通管理ディレクトリを使う worktree には Hook とコピーを共有し、チェック時は各 worktree の index を読みます。worktree 固有の `core.hooksPath` がある場合は、そちらへの組み込みが必要です。
 
-対象の既存 Git Hook や `core.hooksPath` がある場合、`install` はそれらを上書きせず停止します。Husky・pre-commit 等の既存管理方法に合わせて、次の操作でスクリプトだけをコピーし、その呼び出しを既存 Hook へ組み込みます。
+対象の既存 Git Hook や `core.hooksPath` がある場合、`install` はそれらを上書きせず停止します。既存の Hook を HQ と併用する場合は、その Hook を [`<Hook 名>.d/`](#チェックの前に処理を走らせる) へ移してから `install` すると、チェックの前に実行されます。移した Hook が自身の配置場所を前提にしていないかは確認します。Husky・pre-commit 等、`core.hooksPath` や独自の Hook で管理している場合は、次の操作でスクリプトだけをコピーし、その呼び出しを既存 Hook へ組み込みます。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" prepare --repo .
@@ -32,6 +32,26 @@ python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" || exit 
 ```
 
 既存管理方法への手動組み込みは `status` で実行経路を保証できません。`external-hook-unverified` または `hook-missing-or-modified` と表示します。既存管理方法のテスト手順と、隔離したリポジトリで拒否されるコミットの試験で確認します。
+
+## チェックの前に処理を走らせる
+
+HQ の Hook は、同じ場所にある `<Hook 名>.d/` の実行ファイルを名前の順に実行してから、最後にチェックを実行します。整形のようにステージ内容を変える処理や、プロジェクト固有の確認は、Hook を書き換えずにここへ置きます。HQ の Hook の内容は変わらないため、`status` は `ready` のままです。
+
+```bash
+hooks_dir="$(git rev-parse --git-common-dir)/hooks"
+mkdir -p "$hooks_dir/pre-commit.d"
+cp <処理のスクリプト> "$hooks_dir/pre-commit.d/10-format"
+chmod +x "$hooks_dir/pre-commit.d/10-format"
+```
+
+- Hook ごとに `pre-commit.d/`・`pre-merge-commit.d/`・`pre-applypatch.d/` を使います。worktree には共有され、Git 管理対象にはなりません。clone 先では置き直します。
+- 名前の順に実行します。順序は `10-`・`20-` のような番号の接頭辞で決めます。`.` で始まる名前は無視します。
+- 各処理は Hook と同じ作業ディレクトリ・引数・環境変数で実行します。`GIT_INDEX_FILE` も引き継ぐため、`git commit -a`・`git commit --only` でも、コミットに使う index を `git add` 等で更新できます。
+- チェックは最後に実行し、処理が更新した後の index を検査します。処理がステージした内容も検出の対象です。
+- 処理が非ゼロで終了した場合や、実行できないもの（実行権限のないファイル・ディレクトリ・リンク切れ）がある場合は、チェックの前にコミットを止めます。黙って飛ばしません。
+- 処理の内容は利用先の管理物です。処理はチェックと同じ権限で動くため、信頼できるものだけを置きます。`status` は HQ の Hook とコピーしたチェックだけを確認し、`<Hook 名>.d/` の内容は保証しません。`uninstall` は `<Hook 名>.d/` を残し、以後は実行されなくなります。
+
+Git 2.54 以降は設定で Hook を追加でき（`hook.<名前>.command`）、HQ の Hook より先に実行されます。それより前の Git は設定の Hook を表示なしで無視するため、使う Git の版や、GUI クライアントが同梱する Git によって処理が抜けます。版によらず実行するには `<Hook 名>.d/` を使います。
 
 ## 普段の使い方
 
@@ -94,16 +114,16 @@ python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" --finger
 
 ## 更新・解除と状態表示
 
-HQ Plugin の更新だけではコピー済みコードは変更しません。更新内容を確認し、各リポジトリで明示的に更新します。コピーを手編集している場合は上書きせず停止します。
+HQ Plugin の更新だけではコピー済みコードと Hook は変更しません。更新内容を確認し、各リポジトリで明示的に更新します。`update` はコピーしたチェックと、以前の版の HQ の Hook を現在の版に置き換えます。コピーを手編集している場合は上書きせず停止します。手編集した Hook や HQ 以外の Hook は置き換えません。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" update --repo .
 python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 ```
 
-`not-installed` は未導入、`damaged` はコピー／管理情報の欠損や変更、`hook-missing-or-modified` は Hook の欠損・変更・実行権限不足、`external-hook-unverified` は外部管理経路の未確認、`update-available` は稼働するコピーと HQ のソースの不一致を示します。問題があれば通常のコミットを進める前に確認します。
+`not-installed` は未導入、`damaged` はコピー／管理情報の欠損や変更、`hook-missing-or-modified` は Hook の欠損・変更・実行権限不足、`external-hook-unverified` は外部管理経路の未確認、`update-available` は稼働するコピーまたは Hook が HQ の現在の版より古いことを示します。問題があれば通常のコミットを進める前に確認します。
 
-HQ が設置した標準 Hook とコピーを解除する場合は次を使います。同じ Git 共通管理ディレクトリの worktree にも影響します。既存 Hook や外部管理経路がある場合は自動削除せず、先にその管理方法で HQ の呼び出しを除去します。
+HQ が設置した標準 Hook（以前の版を含む）とコピーを解除する場合は次を使います。同じ Git 共通管理ディレクトリの worktree にも影響します。既存 Hook や外部管理経路がある場合は自動削除せず、先にその管理方法で HQ の呼び出しを除去します。`<Hook 名>.d/` は残します。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" uninstall --repo .
@@ -125,4 +145,4 @@ GitHub 上で作成するコミットにはローカル Hook は適用されま�
 python3 -m unittest discover -s tests -v
 ```
 
-隔離した Git リポジトリで、検出と正常系、部分ステージ、初回コミット、名前変更・削除・特殊なファイル名、worktree、Git の一時 index、例外、読み取り失敗、既存 Hook の保全、実際のコミット停止を確認します。モデル呼び出しは不要です。配布設定・対象製品での確認は [README の検証手順](../README.md#検証) に従います。
+隔離した Git リポジトリで、検出と正常系、部分ステージ、初回コミット、名前変更・削除・特殊なファイル名、worktree、Git の一時 index、例外、読み取り失敗、既存 Hook の保全、`<Hook 名>.d/` の処理の順序・失敗・index の更新、以前の版の Hook の更新、実際のコミット停止を確認します。モデル呼び出しは不要です。配布設定・対象製品での確認は [README の検証手順](../README.md#検証) に従います。
