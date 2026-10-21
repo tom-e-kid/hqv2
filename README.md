@@ -347,6 +347,10 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
 
+開発専用の [refresh-plugin](.agents/skills/refresh-plugin/SKILL.md) は、Codex の `$refresh-plugin`、Claude Code の `/refresh-plugin` で呼び出せます。`develop` への切り替え、fetch と fast-forward による最新化、Codex の HQ Plugin の再インストールと内容照合を行います。未コミット変更やローカルの先行・分岐があれば停止します。呼び出す製品にかかわらず、更新対象は Codex のインストールです。利用先では更新後に新しい Codex チャット・セッションを開始してください。
+
+本体は `.agents/skills/refresh-plugin/` に置き、Claude Code は `.claude/skills/refresh-plugin` の相対シンボリックリンクから同じ内容を読みます。Plugin として配布する共通 Skill には含めません。コピー済みの Git コミット前チェックは別途更新が必要です。
+
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
 Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
 
@@ -360,6 +364,8 @@ CLAUDE.md                           AGENTS.md をインポート
 .codex-plugin/plugin.json            Codex 用マニフェスト
 .claude-plugin/plugin.json           Claude Code 用マニフェスト
 .agents/plugins/marketplace.json     Codex 用カタログ
+.agents/skills/refresh-plugin/       開発専用のローカル反映 Skill
+.claude/skills/refresh-plugin        上記への相対シンボリックリンク
 .claude-plugin/marketplace.json      Claude Code 用カタログ
 skills/sdd/
   SKILL.md                          共通の入口

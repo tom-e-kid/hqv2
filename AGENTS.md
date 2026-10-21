@@ -12,6 +12,7 @@
 
 - 共通 Skill は `skills/<skill-name>/` に置く。大枠の策定・見直しは `skills/sdd/`、具体的な作業の相談・実装・検証・再開は `skills/steering/`、プロジェクトの落とし穴の参照・記録・整理は `skills/gotchas/`、Git・GitHub の作業準備・コミット・取り込みは `skills/git/`、PR の作成・更新と書式は `skills/pr/`、AI Reviewer の指摘への対応・再確認は `skills/pr-feedback/`、CHANGELOG・バージョンの整理とリリースは `skills/release/` が担う。
 - Claude Code の agent 定義はルートの `agents/` に置く。`skills/<skill-name>/agents/` に置く Skill の付属メタデータとは区別する。
+- このリポジトリの開発専用 Skill は `.agents/skills/<skill-name>/` に置き、Claude Code 用に `.claude/skills/<skill-name>` から相対シンボリックリンクを張る。Plugin として配布する共通 Skill とは分ける。
 - Hooks・MCP などの追加機能は、対象製品が対応する形式・配置を確認して追加する。製品ごとに形式が異なる場合は設定を分ける。使わない機能の空ディレクトリや仮の定義は作らない。
 - Codex は `.codex-plugin/plugin.json`、Claude Code は `.claude-plugin/plugin.json` を使う。構成要素は Plugin のルートを基準に配置・参照する。
 - 名前とバージョンは両マニフェストで揃える。リリース時は両方のバージョンを更新し、カタログ・README・呼び出し例も整合させる。
