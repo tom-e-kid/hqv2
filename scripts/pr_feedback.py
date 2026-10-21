@@ -391,7 +391,7 @@ class Monitor:
                 else:
                     state.update(status='batch', rounds=state['rounds'] + 1, batch=pending)
             elif expired or (all_done and quiet and not pending):
-                state.update(status='ended', reason='converged' if all_done and not pending else 'wait-timeout', remaining=pending)
+                state.update(status='ended', reason='converged' if all_done and quiet and not pending else 'wait-timeout', remaining=pending)
             self.save(state)
             return {'status': state['status'], 'round': state['rounds'], 'reason': state.get('reason'),
                     'items': state.get('batch') if state['status'] == 'batch' else state.get('remaining', []),

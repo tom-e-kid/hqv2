@@ -6,6 +6,7 @@ from contextlib import contextmanager
 import os
 from pathlib import Path
 import re
+import signal
 import sys
 import time
 import subprocess
@@ -35,26 +36,32 @@ def continuation(message):
 @contextmanager
 def prevent_idle_sleep(waiting):
     process = None
+    warning = 'HQ pr-feedback: idle sleep prevention failed; monitoring may be interrupted'
     if waiting and sys.platform == 'darwin':
         try:
             process = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())],
                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except OSError:
-            print('HQ pr-feedback: idle sleep prevention failed; monitoring may be interrupted', file=sys.stderr)
+            print(warning, file=sys.stderr)
     try:
         yield
     finally:
         if process is not None:
+            expected_codes = {0}
             if process.poll() is None:
                 try:
                     process.terminate()
+                    expected_codes.add(-signal.SIGTERM)
                 except ProcessLookupError:
                     pass
             try:
-                process.wait(timeout=1)
+                returncode = process.wait(timeout=1)
             except subprocess.TimeoutExpired:
                 process.kill()
-                process.wait(timeout=1)
+                expected_codes.add(-signal.SIGKILL)
+                returncode = process.wait(timeout=1)
+            if returncode not in expected_codes:
+                print(warning, file=sys.stderr)
 
 
 def handle(event, sleep=time.sleep, monotonic=time.monotonic):

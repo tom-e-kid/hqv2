@@ -1,5 +1,6 @@
 """Interrupted waits must be visible without stealing a live monitor."""
 import json
+import signal
 import subprocess
 import sys
 import unittest
@@ -72,6 +73,23 @@ class InterruptionTest(unittest.TestCase):
         self.assertEqual(result['status'], 'batch')
         self.assertFalse(self.monitor.status(1, 'session')['interruptionSuspected'])
 
+    def test_api_read_crossing_deadline_requires_quiet_before_convergence(self):
+        self.fake.data = shared.snapshot('')
+        self.monitor.config['quietSeconds'] = 20
+        state = self.monitor.read(1)
+        state.update(deadline=1005, lastChange=1000, observed=pf.digest([]))
+        self.monitor.save(state)
+        current = [1000]
+
+        def fetch(_):
+            current[0] = 1006
+            return self.fake.data
+
+        with patch.object(pf.time, 'time', side_effect=lambda: current[0]), patch.object(self.fake, 'snapshot', side_effect=fetch):
+            result = self.monitor.poll(1, 'session')
+        self.assertEqual(result['reason'], 'wait-timeout')
+        self.assertEqual(self.monitor.read(1)['lastPolledAt'], 1006)
+
     def test_status_cli_returns_diagnostic(self):
         self.expire()
         with patch.object(pf, 'Monitor', return_value=self.monitor), patch.object(sys, 'argv',
@@ -136,6 +154,7 @@ class SleepGuardTest(unittest.TestCase):
         for fail in (False, True):
             process = Mock()
             process.poll.return_value = None
+            process.wait.return_value = -signal.SIGTERM
             with self.subTest(fail=fail), patch.object(hook.sys, 'platform', 'darwin'), \
                     patch.object(hook.subprocess, 'Popen', return_value=process) as start:
                 try:
@@ -163,12 +182,40 @@ class SleepGuardTest(unittest.TestCase):
                 pass
         self.assertIn('idle sleep prevention failed', ''.join(c.args[0] for c in stderr.write.call_args_list))
 
+    def test_abnormal_child_exit_warns_without_aborting_monitor(self):
+        for observed, final in ((1, 1), (-signal.SIGKILL, -signal.SIGKILL), (None, 1)):
+            process = Mock()
+            process.poll.return_value = observed
+            process.wait.return_value = final
+            with self.subTest(observed=observed, final=final), patch.object(hook.sys, 'platform', 'darwin'), \
+                    patch.object(hook.subprocess, 'Popen', return_value=process), patch.object(hook.sys, 'stderr') as stderr:
+                with hook.prevent_idle_sleep(True):
+                    pass
+                warning = ''.join(c.args[0] for c in stderr.write.call_args_list)
+                self.assertEqual(warning.count('idle sleep prevention failed'), 1)
+                process.wait.assert_called_once()
+                if observed is not None:
+                    process.terminate.assert_not_called()
+
+    def test_success_or_intentional_termination_does_not_warn(self):
+        for observed, final in ((0, 0), (None, 0), (None, -signal.SIGTERM)):
+            process = Mock()
+            process.poll.return_value = observed
+            process.wait.return_value = final
+            with self.subTest(observed=observed, final=final), patch.object(hook.sys, 'platform', 'darwin'), \
+                    patch.object(hook.subprocess, 'Popen', return_value=process), patch.object(hook.sys, 'stderr') as stderr:
+                with hook.prevent_idle_sleep(True):
+                    pass
+                stderr.write.assert_not_called()
+
     def test_child_is_killed_and_reaped_if_cleanup_times_out(self):
         process = Mock()
         process.poll.return_value = None
-        process.wait.side_effect = [subprocess.TimeoutExpired('caffeinate', 1), 0]
-        with patch.object(hook.sys, 'platform', 'darwin'), patch.object(hook.subprocess, 'Popen', return_value=process):
+        process.wait.side_effect = [subprocess.TimeoutExpired('caffeinate', 1), -signal.SIGKILL]
+        with patch.object(hook.sys, 'platform', 'darwin'), patch.object(hook.subprocess, 'Popen', return_value=process), \
+                patch.object(hook.sys, 'stderr') as stderr:
             with hook.prevent_idle_sleep(True):
                 pass
+        stderr.write.assert_not_called()
         process.kill.assert_called_once()
         self.assertEqual(process.wait.call_count, 2)
