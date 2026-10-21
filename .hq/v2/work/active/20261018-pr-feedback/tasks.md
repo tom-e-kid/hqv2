@@ -151,3 +151,25 @@ refresh は ID・旧 fingerprint・対応回数で保存済み operation を照�
 製品内での実機確認は未実施のままであり、今回の時刻・子プロセス差し替えテストとは区別する。PR はユーザーの訂正どおり通常 PR を維持する。
 
 取り込み前の確認で、CHANGELOG の Unreleased の Fixed に記載していたレビュー対応の修正3件を削除した。いずれも同じ Unreleased の Added にある未公開の `pr-feedback` 内の修正であり、公開済みの不具合の修正ではないため。
+
+
+## Issue #10: push 後の待機条件（2026-10-21）
+
+ユーザーはレビュアー別の設定名を `waitAfterPush` とすることに合意し、「それで計画直して対応進めてくれる？」と実装の続行を指示した。#9 の監視中断対策とは独立して `develop` から `fix/pr-feedback-wait-after-push` を作成し、別 PR とする。
+
+- [x] 文字列指定と省略時の true を維持し、オブジェクト設定・厳密な真偽値・正規化後の重複検証を追加。
+- [x] true は現 head、false は PR 内の一度以上の投稿済みレビューで完了を判断する。初回未到着・下書き・取り消しを完了としない。
+- [x] 指摘の取得・追記の契機・Resolve の対象者判定もオブジェクト設定に対応。false の追加指摘を除外しない。
+- [x] 新しいレビューの到着でも静穏期間を取り直す。期限到達時に静穏未成立のまま収束する既存の経路を修正。
+- [x] 修正前に新規12テストの失敗を確認。修正後は独立ブランチの全88テスト成功（既存76件＋新規12件）。既存状態・処理履歴・Cap の保持を含む。
+- [x] README・運用手順・無効状態の設定例・Skill・検証手順・CHANGELOG を更新。構造検証108リンク、差分チェック、Skill 専用検証成功。
+- [x] 進行中イベントの公式仕様と実データを読み取り専用で調査し、今回の完了条件には利用しないと判断。
+- [ ] 利用先の実レビュアーで初回→push→再レビュー→終了を確認する。対象製品内の検証は未実施。
+
+進行中イベントの調査結果: [GitHub の公式 GraphQL リファレンス](https://docs.github.com/en/graphql/reference/pulls#reviewrequestedevent)と実スキーマの照会で、ReviewRequestedEvent には actor・createdAt・requestedReviewer 等があるが、対象 head のフィールドはないことを確認した。CopilotWorkStartedEvent の実スキーマ照会は null。公開 PR microsoft/vscode#342304 の REST timeline では review_requested と copilot_work_started を取得できたが、両者の commit_id は null、前者の requested_reviewer は Copilot、後者は null だった。投稿済みレビューの commit_id は取得できた。GitHub コネクタには生の進行中イベントを取得する機能がなかったため、認証済み CLI を読み取り専用で利用した。
+
+この確認だけで進行中イベントを常に head に対応付けられるとは判断できない。イベント不在を完了根拠にせず、明示した `waitAfterPush` と投稿済みレビューで判定する。実レビューの依頼・返信・Resolve は行っていない。
+
+配布設定は #9 と同じ manifest・catalog・Hook 定義で、同一 checkout で実施した両製品の検証結果を再利用できる。CLI が任意の Plugin Directory 提出用として報告した既存の LICENSE・icon の不足は、この修正の配布設定の検証成功と区別する。ライセンスの新規指定は行わない。
+
+両修正の `git merge-tree` による統合は競合なし。統合したツリーを一時ディレクトリへ展開して全103テスト・構造検証113リンク・Skill 専用検証が成功した。元の作業ブランチと develop は統合確認では変更していない。ユーザーの訂正に基づき、実機確認が未実施であることだけを理由に Draft とせず、両修正を通常 PR #11・#12 として提示する。未検証範囲は本文に維持する。

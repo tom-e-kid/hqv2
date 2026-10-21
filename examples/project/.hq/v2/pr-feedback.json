@@ -2,7 +2,9 @@
   "version": 1,
   "enabled": false,
   "repository": "OWNER/REPOSITORY",
-  "reviewers": ["copilot-pull-request-reviewer"],
+  "reviewers": [
+    {"login": "copilot-pull-request-reviewer", "waitAfterPush": true}
+  ],
   "ignoreReviewBodies": ["copilot-pull-request-reviewer"],
   "maxRounds": 3,
   "quietSeconds": 120,

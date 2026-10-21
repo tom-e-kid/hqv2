@@ -176,7 +176,9 @@ claude
   "version": 1,
   "enabled": true,
   "repository": "OWNER/REPOSITORY",
-  "reviewers": ["copilot-pull-request-reviewer"],
+  "reviewers": [
+    {"login": "copilot-pull-request-reviewer", "waitAfterPush": true}
+  ],
   "ignoreReviewBodies": ["copilot-pull-request-reviewer"],
   "maxRounds": 3,
   "quietSeconds": 120,
@@ -187,6 +189,8 @@ claude
 ```
 
 `repository` は利用先の `OWNER/REPOSITORY` に置き換えます。`reviewers` は GitHub GraphQL API が返す投稿アカウントの `login` です。Copilot は `copilot-pull-request-reviewer` を指定します。末尾の `[bot]` と大文字・小文字の違いは照合時に正規化します。`ignoreReviewBodies` は総評を対応対象から除く login です。省略時は Copilot の総評を除き、個別スレッドとレビュー完了の検出は維持します。本文にも指摘を載せるレビュアーでは除外しないでください。自前レビュアーや複数のレビュアーでは対象の login を配列に指定します。未設定・`enabled: false` のリポジトリでは監視しません。[無効状態の設定例](examples/project/.hq/v2/pr-feedback.json)も参照できます。
+
+`waitAfterPush: true` は push のたびに新しいレビューを待ち、false はその PR の初回レビューだけ待ちます。省略時は true です。従来の文字列指定も引き続き使えます。false のレビュアーから監視中に届いた追加指摘も取得します。複数レビュアーを混在させる例と入力条件は [運用手順](docs/pr-feedback.md) を参照してください。
 
 同じチャットで、許可する操作を明示します。次の依頼文は両製品で使えます。
 

@@ -38,6 +38,32 @@ def login(value):
     return re.sub(r'\[bot\]$', '', value.lower())
 
 
+def reviewer_login(value):
+    return login(value['login'] if isinstance(value, dict) else value)
+
+
+def normalize_reviewers(reviewers):
+    if not isinstance(reviewers, list) or not reviewers:
+        raise FeedbackError('pr-feedback.json: reviewers must be a nonempty list')
+    result, seen = [], set()
+    for reviewer in reviewers:
+        entry = {'login': reviewer} if isinstance(reviewer, str) else reviewer
+        if not isinstance(entry, dict) or set(entry) - {'login', 'waitAfterPush'}:
+            raise FeedbackError('pr-feedback.json: reviewer must be a login or {login, waitAfterPush}')
+        account = entry.get('login')
+        wait = entry.get('waitAfterPush', True)
+        if not isinstance(account, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(?:\[bot\])?', account):
+            raise FeedbackError('pr-feedback.json: reviewer login must be an exact account login')
+        if type(wait) is not bool:
+            raise FeedbackError('pr-feedback.json: waitAfterPush must be boolean')
+        account = login(account)
+        if account in seen:
+            raise FeedbackError('pr-feedback.json: duplicate reviewer login')
+        seen.add(account)
+        result.append({'login': account, 'waitAfterPush': wait})
+    return result
+
+
 def load_config(root):
     path = root / '.hq/v2/pr-feedback.json'
     if not path.exists():
@@ -51,9 +77,7 @@ def load_config(root):
         raise FeedbackError('pr-feedback.json: version must be 1')
     if not re.fullmatch(r'[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+', config.get('repository', '')):
         raise FeedbackError('pr-feedback.json: repository must be owner/name')
-    reviewers = config.get('reviewers')
-    if not isinstance(reviewers, list) or not reviewers or any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(?:\[bot\])?', x) for x in reviewers):
-        raise FeedbackError('pr-feedback.json: reviewers must be a nonempty list of exact account logins')
+    config['reviewers'] = normalize_reviewers(config.get('reviewers'))
     ignored = config.setdefault('ignoreReviewBodies', ['copilot-pull-request-reviewer'])
     if not isinstance(ignored, list) or any(not isinstance(x, str) or not re.fullmatch(r'[A-Za-z0-9_-]+(?:\[bot\])?', x) for x in ignored):
         raise FeedbackError('pr-feedback.json: ignoreReviewBodies must be a list of account logins')
@@ -138,7 +162,7 @@ class GitHub:
 
 
 def items_from(snapshot, reviewers, ignore_review_bodies=('copilot-pull-request-reviewer',)):
-    allowed = {login(x) for x in reviewers}
+    allowed = {reviewer_login(x) for x in reviewers}
     ignored = {login(x) for x in ignore_review_bodies}
     items = []
     for kind in ('comments', 'reviews', 'reviewThreads'):
@@ -376,14 +400,21 @@ class Monitor:
                 state['processed'].pop(reopened, None)
             state['resolvedThreads'] = sorted(resolved)
             pending = [x for x in items if state['processed'].get(x['id']) != x.get('triggerFingerprint', x['fingerprint'])]
-            observed = digest([(x['id'], x.get('triggerFingerprint', x['fingerprint'])) for x in pending])
+            allowed = {reviewer_login(x) for x in self.config['reviewers']}
+            # Even an ignored summary can announce a newly completed review.
+            review_activity = [(x['id'], x['state'], (x.get('commit') or {}).get('oid'), x.get('submittedAt'))
+                               for x in snapshot['reviews']
+                               if login((x.get('author') or {}).get('login', '')) in allowed]
+            observed = digest([[(x['id'], x.get('triggerFingerprint', x['fingerprint'])) for x in pending], review_activity])
             if state['observed'] != observed:
                 state.update(observed=observed, lastChange=now)
             quiet = now - state['lastChange'] >= self.config['quietSeconds']
-            # A submitted review for this head establishes completion only for its author.
-            completed = {login((x.get('author') or {}).get('login', '')) for x in snapshot['reviews']
-                         if (x.get('commit') or {}).get('oid') == state['head'] and x['state'] in ('COMMENTED', 'APPROVED', 'CHANGES_REQUESTED')}
-            all_done = {login(x) for x in self.config['reviewers']} <= completed
+            submitted = [x for x in snapshot['reviews'] if x['state'] in ('COMMENTED', 'APPROVED', 'CHANGES_REQUESTED')]
+            completed_once = {login((x.get('author') or {}).get('login', '')) for x in submitted}
+            completed_head = {login((x.get('author') or {}).get('login', '')) for x in submitted
+                              if (x.get('commit') or {}).get('oid') == state['head']}
+            all_done = all(reviewer_login(x) in (completed_once if isinstance(x, dict) and not x['waitAfterPush'] else completed_head)
+                           for x in self.config['reviewers'])
             expired = now >= state['deadline']
             if pending and quiet and (all_done or expired):
                 if state['rounds'] >= self.config['maxRounds']:
@@ -497,7 +528,7 @@ class Monitor:
                         raise FeedbackError('Item is not a resolvable review thread')
                     if not thread['isResolved']:
                         authors = {login((c.get('author') or {}).get('login', '')) for c in thread['comments']['nodes']}
-                        if authors - {login(viewer), *(login(x) for x in self.config['reviewers'])}:
+                        if authors - {login(viewer), *(reviewer_login(x) for x in self.config['reviewers'])}:
                             raise FeedbackError('Human/unknown follow-up prevents automatic Resolve')
             operations = state.setdefault('operations', {})
             for entry in report:

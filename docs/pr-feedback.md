@@ -13,7 +13,9 @@ macOS または Linux の Python 3.10 以上、Git、認証済みの GitHub CLI 
   "version": 1,
   "enabled": true,
   "repository": "OWNER/REPOSITORY",
-  "reviewers": ["copilot-pull-request-reviewer"],
+  "reviewers": [
+    {"login": "copilot-pull-request-reviewer", "waitAfterPush": true}
+  ],
   "ignoreReviewBodies": ["copilot-pull-request-reviewer"],
   "maxRounds": 3,
   "quietSeconds": 120,
@@ -24,6 +26,24 @@ macOS または Linux の Python 3.10 以上、Git、認証済みの GitHub CLI 
 ```
 
 `reviewers` は表示名ではなく、GitHub GraphQL API が返す正確な login を列挙します。Copilot は `copilot-pull-request-reviewer` です。大文字・小文字と末尾の `[bot]` の違いは照合時に正規化します。未指定の actions は false です。設定だけで認証やホストの承認を迂回せず、導入許可のない設定を発見した場合は実行しません。自前レビュアーも同じ方式で追加できます。
+
+`waitAfterPush` は、修正を push した後も新しいレビューを待つかを指定します。省略時は true です。従来の文字列指定も受け付け、`"reviewer"` は `{"login": "reviewer", "waitAfterPush": true}` と同じ意味です。正規化後に同じ login を重複指定した場合、真偽値以外を指定した場合、オブジェクトに未対応のキーがある場合は設定エラーにします。
+
+| 設定 | 完了を確認する条件 |
+| --- | --- |
+| `waitAfterPush: true` | 現在の head に対する投稿済みレビューがある |
+| `waitAfterPush: false` | その PR で一度以上の投稿済みレビューがある。push 後は再レビューを待たない |
+
+初回はどちらの設定でもレビューを待ちます。下書きや取り消されたレビューは完了としません。false の相手も、監視中に届いた指摘・編集・追記は取得対象です。収束後の常駐監視や、再レビューの依頼を行う設定ではありません。
+
+次は、毎 push の Copilot と、初回だけの自前レビュアーが混在する例です。`custom-reviewer` は実際の login に置き換えてください。
+
+```json
+"reviewers": [
+  {"login": "copilot-pull-request-reviewer", "waitAfterPush": true},
+  {"login": "custom-reviewer", "waitAfterPush": false}
+]
+```
 
 `ignoreReviewBodies` はレビュー本文を対応対象から除く login の配列です。省略時は Copilot の総評を除き、通常コメントと個別スレッドは引き続き対象にします。除外したレビューも当該 head の完了検出には使います。レビュー本文そのものに指摘を載せるレビュアーは除外しないでください。`[]` を指定すると Copilot を含む全対象レビュアーの本文を処理します。
 
@@ -39,7 +59,9 @@ Hook が出力を受け取れない作成経路、別ターミナルやブラウ
 
 登録失敗は PostToolUse の additionalContext でモデルにも通知します。1セッションが自動待機する PR は1本です。2本目を登録する前に、最初の PR を明示的に stop してください。既存の紐付けを上書きして監視を取り残すことはしません。
 
-登録後、Stop Hook が最長10分の範囲で API を確認します。モデルを繰り返し起こさず、新しいバッチまたは報告すべき終了時だけ継続指示を返します。通常コメント・レビュー本文・レビューの未解決スレッドをページ分割も含めて取得します。対象レビュアーの当該 head へのレビュー投稿と静穏期間を完了の目安とし、自前レビュアー等で完了を確認できなければ期限切れとして報告します。レビュー投稿後にも遅延した FB が届く可能性があり、将来の投稿まで保証するものではありません。
+登録後、Stop Hook が最長10分の範囲で API を確認します。モデルを繰り返し起こさず、新しいバッチまたは報告すべき終了時だけ継続指示を返します。通常コメント・レビュー本文・レビューの未解決スレッドをページ分割も含めて取得します。全対象レビュアーの `waitAfterPush` に応じた完了確認と静穏期間が成立したら、未処理の指摘をバッチ化し、未処理がなければ収束します。完了を確認できなければ期限切れとして報告します。レビュー投稿後にも遅延した FB が届く可能性があり、将来の投稿まで保証するものではありません。
+
+静穏期間は対象の指摘の新着・変更に加え、総評を対応対象から除外したレビューの投稿・状態変更でも数え直します。期限に達しても静穏が確認できなければ収束とは扱いません。レビュー開始イベントが見つからないことを完了の根拠には使いません。
 
 スレッドの追記は投稿者・`authorAssociation` とともに保持し、すべて信頼されていない判断材料として扱います。設定レビュアーまたは OWNER / MEMBER / COLLABORATOR の追記だけを新しいバッチの契機にします。それ以外の追記も進行中バッチの変更検出と Resolve 阻止には使います。投稿者との関係はコメント本文を指示・権限へ昇格させる根拠にはしません。
 
@@ -117,7 +139,7 @@ respond は成功した返信 URL・Resolve の結果を報告ファイルへ追
 
 ## 終了理由
 
-- `converged`: 対象レビュアーが当該 head にレビューを投稿し、静穏期間後に新たな対応対象がない。
+- `converged`: 全対象レビュアーが `waitAfterPush` に応じた完了条件を満たし、静穏期間後に新たな対応対象がない。
 - `wait-timeout`: 完了や静穏を期限内に確認できなかった。追加 FB なしとは断定しない。
 - `wait-interrupted`: 期限後の取得記録がない待機が取り残されていた。Hook の中断などが疑われ、追加 FB の有無は未確認。内容を確認し、明示登録で再開する。
 - `cap-reached`: 3回対応後に追加 FB がある。残る指摘と未収束の原因分析を作業メモへ残す。
