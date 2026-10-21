@@ -342,6 +342,7 @@ worktree の環境準備は、利用先プロジェクトで指定した手順�
 Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポートする [CLAUDE.md](CLAUDE.md) から共通ルールを読みます。
 これらはこのリポジトリでの開発用です。Plugin のインストール先へ適用する指示は Skill などの構成要素に持たせます。
 `examples/project/` は利用先プロジェクト向けの例です。
+ローカル開発中の変更を Codex の利用先リポジトリで試す際は、[開発中のコードの反映手順](AGENTS.md#codex-で開発中のコードを利用先に反映する) に従い、Marketplace の再登録・Plugin の再インストールと反映確認を行ってから、新しいチャットで動作を確認します。
 このリポジトリは `develop` から作業ブランチを作り、PR で `develop` へ取り込みます。利用者に影響する変更は [CHANGELOG.md](CHANGELOG.md) の `Unreleased` に含めます。リリース準備の更新も `develop` へ反映し、公開対象とバージョンを確定してからリリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開します。詳細は [Git 規約](.hq/v2/git.md)・[リリース規約](.hq/v2/release.md)、設定値は [.hq/v2/settings.json](.hq/v2/settings.json) を参照してください。初回リリースは `2.0.0` とし、開発中の CHANGELOG は `Unreleased` で管理します。
 
 新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。

@@ -30,6 +30,28 @@
 [検証手順](docs/validation.md) を使う。共通の構造・参照と各製品の配布設定を確認し、追加・変更した機能に応じて必要な検証を行う。
 文書だけの変更でモデルを呼ぶ実行テストを必須にしない。製品固有の機能は、その対象製品で検証する。
 
+### Codex で開発中のコードを利用先に反映する
+
+ローカル開発中、利用先リポジトリで変更を試してもらう前に、検証対象の HQ checkout から Marketplace を再登録し、Plugin を再インストールする。ソースの更新や Marketplace の登録だけで、インストール済みキャッシュも更新されたと扱わない。同じバージョンのまま開発している場合も再インストールする。
+
+検証対象のブランチ・コミットと未コミット変更を確認し、その checkout のルートで実行する。取り込み後の最新状態を試す場合は、最新化した `develop` を使う。
+
+```bash
+git status --short --branch
+git rev-parse HEAD
+codex plugin marketplace add .
+codex plugin add hq@hq-marketplace --json
+codex plugin list --marketplace hq-marketplace --json
+```
+
+- 一覧で `hq@hq-marketplace` がインストール済み・有効であり、Marketplace の参照先が意図した checkout であることを確認する。登録済みを示す `alreadyAdded` はキャッシュ更新の確認にはならない。
+- インストール結果の `installedPath` にある、今回変更した Skill・参照文書・スクリプトなどをソースと照合する。バージョン表示だけで最新コードの反映を判断しない。
+- 利用先リポジトリで新しい Codex チャットまたは CLI セッションを開いて確認してもらう。既存チャットが更新後の Skill を読み直したとは扱わない。Hook の変更で信頼確認を求められた場合は、内容を確認して信頼する。
+- 利用先にコピー済みのコミット前チェックなどは Plugin の再インストールでは更新されない。対象も変更した場合は、[コミット前チェックの導入手順](docs/commit-security.md) に従って別途更新する。
+- 一時的な worktree を登録した場合は、削除前に保持する checkout へ再登録・再インストールし、存在しないパスを参照させない。
+
+反映元のブランチ・コミット、未コミット変更の有無、インストール先との照合結果を報告し、利用先での動作確認とは区別する。この手順は Codex 用であり、Claude Code の更新手順は対象製品で確認する。
+
 ## Git・リリース方針
 
 - 通常の作業とリリース準備は `develop` から作業ブランチを作り、PR で `develop` へ取り込む。変更を `develop`・`main` へ直接コミットしない。新規ブランチは `<type>/<short-description>` とし、type は Conventional Commits と揃える。作成ツール名の接頭辞は付けない。
