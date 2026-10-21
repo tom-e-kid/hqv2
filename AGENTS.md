@@ -51,7 +51,25 @@ codex plugin list --marketplace hq-marketplace --json
 - 利用先にコピー済みのコミット前チェックなどは Plugin の再インストールでは更新されない。対象も変更した場合は、[コミット前チェックの導入手順](docs/commit-security.md) に従って別途更新する。
 - 一時的な worktree を登録した場合は、削除前に保持する checkout へ再登録・再インストールし、存在しないパスを参照させない。
 
-反映元のブランチ・コミット、未コミット変更の有無、インストール先との照合結果を報告し、利用先での動作確認とは区別する。この手順は Codex 用であり、Claude Code の更新手順は対象製品で確認する。
+反映元のブランチ・コミット、未コミット変更の有無、インストール先との照合結果を報告し、利用先での動作確認とは区別する。
+
+### Claude Code で開発中のコードを利用先に反映する
+
+HQ の checkout のルートをローカル Marketplace として登録し、user scope にインストールする。他のリポジトリからも同じ登録を利用できる。既存の登録元・scope・有効状態を先に確認し、同名 Marketplace が別のソースを指す場合や、既存の project・local・managed scope の管理・無効設定に干渉する場合は、そのまま変更しない。
+
+```bash
+claude plugin marketplace add .
+claude plugin marketplace update hq-marketplace
+claude plugin install hq@hq-marketplace --scope user
+claude plugin marketplace list --json
+claude plugin list --json
+```
+
+- この構成は、ローカルパスの Marketplace と相対パス `source: "./"` を使うため、現行 Claude Code はソースを直接読み込む。同じバージョンのままでもキャッシュの再コピーは不要で、ソースの変更は次のセッション開始または `/reload-plugins` で読み込まれる。[公式の読み込み仕様](https://code.claude.com/docs/en/plugins/loading#in-place-and-copied-plugins)
+- Marketplace のローカル参照先と、HQ の実際の読み込み元が意図した checkout であることを確認する。Claude Code 2.1.306 の一覧では `readFromFolder` が読み込み元を示し、`installPath` は別のキャッシュパスを示す場合がある。読み込み元を確認できない版は、同じ挙動と決めつけない。
+- Git・リモート Marketplace 等のキャッシュ型インストールは別の経路。同じバージョンでは `plugin update` がコピーを更新しない場合があるため、このローカル直接参照の手順と混同しない。
+- 利用先で新しい Claude Code セッションを開いて確認する。反映元のブランチ・コミット、未コミット変更の有無、登録元・実際の読み込み元を報告し、利用先での動作確認とは区別する。利用先にコピー済みの Git コミット前チェックは別途更新する。
+- 一時的な worktree を登録した場合は、削除前に保持する checkout へ登録を戻す。読み込み元が開発 checkout なので、以後その checkout を別ブランチへ切り替えると、利用先の次のセッションにもその内容が反映される。
 
 ## Git・リリース方針
 

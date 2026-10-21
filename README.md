@@ -347,9 +347,11 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
 
-開発専用の [refresh-plugin](.agents/skills/refresh-plugin/SKILL.md) は、Codex の `$refresh-plugin`、Claude Code の `/refresh-plugin` で呼び出せます。`develop` への切り替え、fetch と fast-forward による最新化、Codex の HQ Plugin の再インストールと内容照合を行います。未コミット変更やローカルの先行・分岐があれば停止します。呼び出す製品にかかわらず、更新対象は Codex のインストールです。利用先では更新後に新しい Codex チャット・セッションを開始してください。
+開発専用の [refresh-plugin](.agents/skills/refresh-plugin/SKILL.md) は、Codex の `$refresh-plugin`、Claude Code の `/refresh-plugin` で呼び出せます。`develop` への切り替え、fetch と fast-forward による最新化後、標準では両製品の HQ Plugin を反映します。Codex は再インストールと内容照合、Claude Code はローカル Marketplace の登録・更新と実際の読み込み元の確認を行います。製品を指定した場合は対象を限定します。未コミット変更やローカルの先行・分岐があれば停止します。利用先では更新後に各製品の新しいチャット・セッションを開始してください。
 
 本体は `.agents/skills/refresh-plugin/` に置き、Claude Code は `.claude/skills/refresh-plugin` の相対シンボリックリンクから同じ内容を読みます。Plugin として配布する共通 Skill には含めません。コピー済みの Git コミット前チェックは別途更新が必要です。
+
+Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
 Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
