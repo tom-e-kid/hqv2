@@ -2,6 +2,8 @@
 """Session-scoped PostToolUse registration and bounded Stop continuation for both clients."""
 
 import json
+from contextlib import contextmanager
+import os
 from pathlib import Path
 import re
 import sys
@@ -28,6 +30,31 @@ def creation_candidate(event):
 
 def continuation(message):
     return {'decision': 'block', 'reason': message}
+
+
+@contextmanager
+def prevent_idle_sleep(waiting):
+    process = None
+    if waiting and sys.platform == 'darwin':
+        try:
+            process = subprocess.Popen(['/usr/bin/caffeinate', '-i', '-w', str(os.getpid())],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError:
+            print('HQ pr-feedback: idle sleep prevention failed; monitoring may be interrupted', file=sys.stderr)
+    try:
+        yield
+    finally:
+        if process is not None:
+            if process.poll() is None:
+                try:
+                    process.terminate()
+                except ProcessLookupError:
+                    pass
+            try:
+                process.wait(timeout=1)
+            except subprocess.TimeoutExpired:
+                process.kill()
+                process.wait(timeout=1)
 
 
 def handle(event, sleep=time.sleep, monotonic=time.monotonic):
@@ -70,15 +97,32 @@ def handle(event, sleep=time.sleep, monotonic=time.monotonic):
     if kind in ('SessionEnd', 'Interrupt'):
         monitor.stop(number, session, {'SessionEnd': 'session-ended', 'Interrupt': 'user-interrupted'}[kind])
         return None
+    # Separate from the short state lock: a competing Stop must not stop a live waiter.
+    with monitor.lock(f'{number}-wait', required=False) as acquired:
+        if not acquired:
+            return None
+        state = monitor.begin_wait(number, session)
+        with prevent_idle_sleep(state['status'] == 'waiting'):
+            return wait_for_feedback(monitor, number, session, sleep, monotonic)
+
+
+def wait_for_feedback(monitor, number, session, sleep, monotonic):
     try:
         # Keep the whole hook below its 660s host timeout; persisted deadline spans re-entry.
         started = monotonic()
+        wall_started = time.time()
         monitor.github.deadline = time.monotonic() + 610
+        monitor.github.wall_deadline = wall_started + 610
         while True:
+            if max(monotonic() - started, time.time() - wall_started) >= 610:
+                monitor.stop(number, session, 'wait-timeout')
+                result = {'status': 'ended', 'reason': 'wait-timeout'}
+                break
             result = monitor.poll(number, session)
             if result['status'] != 'waiting':
                 break
-            remaining = min(result['deadline'] - time.time(), 610 - (monotonic() - started))
+            remaining = min(result['deadline'] - time.time(), 610 - (monotonic() - started),
+                            610 - (time.time() - wall_started))
             if remaining <= 0:
                 monitor.stop(number, session, 'wait-timeout')
                 result = {'status': 'ended', 'reason': 'wait-timeout'}
@@ -105,7 +149,9 @@ def handle(event, sleep=time.sleep, monotonic=time.monotonic):
             monitor.save(state)
         return continuation(f'HQ pr-feedback ended for PR #{number}: {result.get("reason")}. '
             f'Session: {session}. Read status and report results, deferred issue candidates and remaining feedback. '
-            'For cap-reached, analyze the cause and save a work memo. A timeout is not confirmed convergence.')
+            'For cap-reached, analyze the cause and save a work memo. '
+            'For wait-interrupted, the previous wait expired without a final check; the Hook may have been interrupted. '
+            'Report feedback as unverified and resume explicitly. A timeout is not confirmed convergence.')
     except (FeedbackError, OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
         # Stop once and ask for a truthful failure report, never spin on an API error.
         state = monitor.stop(number, session, 'monitor-error')

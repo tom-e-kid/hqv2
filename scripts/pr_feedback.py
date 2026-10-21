@@ -75,12 +75,15 @@ class GitHub:
         self.root, self.repository = root, repository
         self.owner, self.name = repository.split('/')
         self.deadline = None
+        self.wall_deadline = None
 
     def api(self, endpoint, method='GET', payload=None):
         argv = ['gh', 'api', '--hostname', 'github.com', endpoint, '--method', method]
         if payload is not None:
             argv += ['--input', '-']
         remaining = 45 if self.deadline is None else min(45, self.deadline - time.monotonic())
+        if self.wall_deadline is not None:
+            remaining = min(remaining, self.wall_deadline - time.time())
         if remaining <= 0:
             raise FeedbackError('GitHub read deadline exceeded')
         return json.loads(run(argv, self.root, json.dumps(payload) if payload is not None else None, timeout=remaining))
@@ -181,14 +184,17 @@ class Monitor:
             self.github = GitHub(self.root, self.config['repository'])
 
     @contextmanager
-    def lock(self, key):
+    def lock(self, key, *, required=True):
         self.store.mkdir(parents=True, exist_ok=True)
         with (self.store / f'{key}.lock').open('a') as handle:
             try:
                 fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
-                raise FeedbackError('PR monitor is busy in another process') from None
-            yield
+                if required:
+                    raise FeedbackError('PR monitor is busy in another process') from None
+                yield False
+                return
+            yield True
 
     def path(self, number):
         return self.store / f'{number}.json'
@@ -236,6 +242,7 @@ class Monitor:
 
     def _register(self, number, session, pushed_head=None):
         with self.lock(number):
+            resumed = False
             pr = self.check_pr(number)
             verified_push = bool(pushed_head and self.config['actions']['push'] and pr['head'] == pushed_head
                                  and run(['git', 'rev-parse', 'HEAD'], self.root) == pushed_head)
@@ -249,6 +256,10 @@ class Monitor:
                     raise FeedbackError('PR already owned by another worktree; stop it before resuming here')
                 if state['status'] != 'ended' and state['head'] != pr['head'] and not verified_push:
                     raise FeedbackError('Unexpected remote head change; inspect before restarting')
+                with self.lock(f'{number}-wait', required=False) as available:
+                    if available and self.unobserved_expiry(state):
+                        self.mark_interrupted(state)
+                        resumed = True
                 state['session'] = session
                 state['worktree'] = str(self.root)
                 if state['status'] == 'ended':
@@ -264,7 +275,7 @@ class Monitor:
                              session=session, worktree=str(self.root), deadline=time.time() + self.config['waitSeconds'], lastChange=time.time())
             self.save(state)
             self.session_path(session).write_text(json.dumps({'number': number}))
-            return state
+            return dict(state, resumedAfterInterruption=True) if resumed else state
 
     def items(self, snapshot):
         return items_from(snapshot, self.config['reviewers'], self.config['ignoreReviewBodies'])
@@ -315,8 +326,35 @@ class Monitor:
             raise FeedbackError('Monitor belongs to another session or worktree')
         return state
 
+    @staticmethod
+    def unobserved_expiry(state):
+        return (state['status'] == 'waiting' and time.time() >= state['deadline']
+                and (state.get('lastPolledAt') or 0) < state['deadline'])
+
+    @staticmethod
+    def mark_interrupted(state):
+        state['lastInterruption'] = {'detectedAt': time.time(), 'deadline': state['deadline'],
+                                     'lastPolledAt': state.get('lastPolledAt')}
+        state.update(status='ended', reason='wait-interrupted', notified=False)
+
+    def status(self, number, session):
+        """Diagnose abandoned waits without changing saved state or contacting GitHub."""
+        with self.lock(number):
+            state = self.owned(number, session)
+            with self.lock(f'{number}-wait', required=False) as available:
+                return dict(state, waitActive=not available,
+                            interruptionSuspected=available and self.unobserved_expiry(state))
+
+    def begin_wait(self, number, session):
+        """Called only while holding the separate, process-lifetime wait lock."""
+        with self.lock(number):
+            state = self.owned(number, session)
+            if self.unobserved_expiry(state):
+                self.mark_interrupted(state)
+                self.save(state)
+            return state
+
     def poll(self, number, session, now=None):
-        now = time.time() if now is None else now
         with self.lock(number):
             state = self.owned(number, session)
             if state['status'] == 'ended':
@@ -330,6 +368,8 @@ class Monitor:
             # Guard against a push during paginated reads.
             if self.github.pr(number)['head'] != state['head']:
                 raise FeedbackError('Head changed while collecting feedback')
+            now = time.time() if now is None else now
+            state['lastPolledAt'] = now
             items = self.items(snapshot)
             resolved = {x['id'] for x in snapshot['reviewThreads'] if x['isResolved']}
             for reopened in set(state.get('resolvedThreads', [])) - resolved:
@@ -537,7 +577,7 @@ def main():
     elif args.command == 'poll':
         result = monitor.poll(args.pr, args.session)
     elif args.command == 'status':
-        result = monitor.owned(args.pr, args.session)
+        result = monitor.status(args.pr, args.session)
     elif args.command == 'stop':
         result = monitor.stop(args.pr, args.session, args.reason)
     elif args.command == 'refresh':

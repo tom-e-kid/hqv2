@@ -20,6 +20,8 @@
 
 ### Changed
 
+- `pr-feedback` の macOS Hook 待機中のアイドルスリープ抑止と、取り残された待機の検出・報告・履歴を保った再開を追加。
+
 - README に `pr-feedback` の利用先セットアップ手順を追加し、共通設定と Codex・Claude Code ごとの読み込み・Hook・開始・停止の差異を明記。
 
 - `git` Skill の worktree 命名規則と既存 checkout の再利用優先を撤廃し、作成・再利用と配置・命名を利用先の運用やツールに委ねる。他セッションの作業保全とローカル設定の引き継ぎは維持。開発用設定を限定して引き継ぐ原則と、Codex・Claude Code の `.worktreeinclude` およびセットアップ方法を README に追記。
