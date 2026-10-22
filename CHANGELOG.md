@@ -26,7 +26,7 @@
 
 - README に `pr-feedback` の利用先セットアップ手順を追加し、共通設定と Codex・Claude Code ごとの読み込み・Hook・開始・停止の差異を明記。
 
-- `git` Skill の worktree 命名規則と既存 checkout の再利用優先を撤廃し、作成・再利用と配置・命名を利用先の運用やツールに委ねる。他セッションの作業保全とローカル設定の引き継ぎは維持。開発用設定を限定して引き継ぐ原則と、Codex・Claude Code の `.worktreeinclude` およびセットアップ方法を README に追記。
+- worktree の標準運用を、新規作業ごとの専用環境作成と再開時の再利用に統一。標準配置を基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` とし、利用先の `AGENTS.md` または参照先の規約で項目ごとに上書き可能にした。転記できる規約と、長期開発系列・個別作業の使い分け、環境準備・整理の条件を整備し、README・設定説明・利用先例・検証手順を統一。Codex・Claude Code ごとの `.worktreeinclude` およびセットアップ方法は README に記載。
 
 - README の前半を利用者向けの導入・使い方に整理し、コミット前チェックのチャット依頼例と手動導入・状態確認を追加。
 
