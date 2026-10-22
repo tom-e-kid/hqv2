@@ -1,7 +1,7 @@
 # 作業メモの週次整理を試行する
 
 概要: HQ 開発専用 Skill に作業メモの評価・分類・整理・PR 提出手順を定義し、週次実行で試す。
-状態: Skill の実装・静的検証済み。週次タスクを登録済み。develop 向け PR を準備中。定期実行での実動作は未検証。
+状態: Skill の実装・静的検証済み。週次タスクを登録済み。[PR #17](https://github.com/tom-e-kid/hqv2/pull/17) を develop 向けに提出し、取り込み待ち。定期実行での実動作は未検証。
 
 ## 要求と合意
 
@@ -19,7 +19,7 @@
 
 - [x] Skill・README・Claude Code 用リンクを作成する。
 - [x] 静的検証と、現行記録に対する読み取り評価で分類条件を確認する。
-- [ ] 開発専用 Skill の追加を develop 向け PR にする。
+- [x] 開発専用 Skill の追加を develop 向け PR にする。
 - [x] 毎週日曜 3:00（Asia/Tokyo）のタスクを登録する。
 - [ ] 最初の数回の PR で誤分類・整理漏れ・通知頻度を評価する。
 
@@ -32,6 +32,7 @@
 - `python3 scripts/validate.py`: 成功。7 shared skills・両 Marketplace・136 ローカル参照を確認。
 - Skill Creator の `quick_validate.py`: 一時仮想環境に PyYAML 6.0.3 を入れて成功。通常の Python 環境は変更していない。
 - Claude Code 用リンクの実体が `.agents/skills/work-maintenance/` と一致することを確認。
+- `git diff --check`、`git diff --cached --check`、`python3 scripts/commit_security.py` とコミット時の Git Hook: 成功。ステージ済み4ファイル、明示的例外0件。
 - `claude plugin validate .` とマニフェスト指定の通常検証: 終了コード0。既知のルート CLAUDE.md 警告と、変更前から存在する任意の Directory 提出用 LICENSE・icon 不足の表示あり。
 - Codex の一時設定による対象 worktree のカタログ読み込み: `hq@hq-marketplace` を確認。個人の Marketplace 設定や Plugin キャッシュは変更していない。制限環境で PATH alias 作成警告あり。
 - 読み取り評価: GitHub の merged PR 検索で PR #16 の取り込みと develop の merge commit を照合。worktree 方針の記録は「未取り込み」のままであり、状態更新と保存先の判断の候補になる。今回その記録自体は編集していない。
