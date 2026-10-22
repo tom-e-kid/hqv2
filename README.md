@@ -359,6 +359,16 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 本体は `.agents/skills/refresh-plugin/` に置き、Claude Code は `.claude/skills/refresh-plugin` の相対シンボリックリンクから同じ内容を読みます。Plugin として配布する共通 Skill には含めません。コピー済みの Git コミット前チェックは別途更新が必要です。
 
+### 作業メモの週次整理（HQ 開発専用・試行）
+
+開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `.hq/v2/work/` を点検し、状態更新・active 維持・archived への移動・削除を判断します。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
+
+このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。汎用化と共通 Plugin への収録は試行後に判断します。
+
+タスクには対象 checkout と、次の実行指示を設定します。評価・整理の基準は Skill に集約します。
+
+> HQ checkout の develop に取り込まれた `.agents/skills/work-maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
+
 Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
 最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
