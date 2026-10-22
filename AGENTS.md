@@ -78,3 +78,10 @@ claude plugin list --json
 - 利用者に影響する変更は、同じ作業で [CHANGELOG.md](CHANGELOG.md) の `Unreleased` を更新する。
 - リリース時に公開対象とバージョンを確定し、CHANGELOG・関連ファイルを更新して `develop` へ反映する。リリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開する。
 - 設定値は [.hq/v2/settings.json](.hq/v2/settings.json)、必須検証と PR の扱いは [Git 規約](.hq/v2/git.md)、初回バージョン・公開条件は [リリース規約](.hq/v2/release.md) に記載する。ローカル固有の設定は `.hq/v2/.ignore/` に置き、Git 管理しない。
+
+### worktree 運用
+
+- 新規作業では、ファイル変更を始める前に `develop` から作業ブランチと専用 worktree を作成する。相談・参照だけの場合は作成しない。
+- 既存作業の再開では、対応する作業ブランチと worktree を再利用する。今回の作業専用として用意済みの worktree も使い、セッションごとに重ねて作成しない。
+- 作成先は Git の主作業ツリーを基準に `.hq/v2/.ignore/worktrees/<作業名>/` とし、作成した worktree 内には入れ子で作成しない。
+- その他の命名・環境準備・整理は [worktree の標準運用](skills/git/references/worktree.md) に従う。Plugin の反映元として登録した worktree の整理では、本ファイルの反映手順に従って登録先を戻す。

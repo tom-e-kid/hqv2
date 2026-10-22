@@ -271,7 +271,7 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 新しい作業記録は `.hq/v2/work/active/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
 
-Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree の作成・再利用、配置・命名は利用先の運用やツールに合わせて選び、ブランチとの一対一対応は求めません。対象は Git の情報で確認し、他の作業やセッションが使う checkout と未コミット変更を保全します。
+Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
 利用先の AGENTS.md には適用方針と参照先を残し、検証・PR 省略条件は [.hq/v2/git.md の例](examples/project/.hq/v2/git.md) を既存文書へ統合します。lint・型チェック・クリーンビルド・単体テストなどを一律に必須とせず、プロジェクトごとに適用条件と実在するコマンドを定めます。環境・テスト・配布ツールという分類だけで PR を省略しません。
 
@@ -295,6 +295,14 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
+
+### worktree の標準運用をプロジェクトに合わせる
+
+[標準運用と上書き](skills/git/references/worktree.md) に、利用先の `AGENTS.md` へそのまま転記・編集できる規約を用意しています。[AGENTS.md の例](examples/project/AGENTS.md#worktree-運用) にも同じ標準運用を載せています。全項目をコピーする必要はなく、作成方針や配置など変更したい項目だけ指定できます。例えば、毎回の作成を「状況に応じて判断する」に変更しても、未指定の配置や再開方針は標準のまま使えます。
+
+長期開発系列を維持する worktree と、ベースブランチへ取り込む個別作業用の worktree を区別します。両者は併用でき、長期系列のベースから個別作業を分岐できます。系列用の worktree は保持し、個別作業用は取り込みと利用終了を確認して整理します。セッション単位ではなく作業単位で扱い、今回の作業用に CLI やアプリが既に用意した専用 worktree も再利用します。
+
+標準配置は Git 管理対象外にします。[.gitignore の例](examples/project/.gitignore) を統合し、Git の情報から基準 checkout を確認して配置を固定します。新規作成には指定パスを扱える方法を使い、CLI やアプリ固有の管理先は利用先で指定した場合に使います。以下の製品別手順は、各作成方法を選んだ場合の環境準備を説明しています。
 
 ### worktree に開発用のローカル設定を用意する
 
