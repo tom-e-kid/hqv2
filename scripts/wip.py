@@ -169,10 +169,14 @@ def check_pr(root, base):
     records, findings = [], []
     for name in names:
         path = f"{records_dir.as_posix()}/{name}"
+        # Like records(), hidden entries and anything but a directory are not records.
+        if name.startswith(".") or git(root, "cat-file", "-t", f"HEAD:{path}").stdout.strip() != "tree":
+            continue  # Includes a record removed by this change, for example when sweeping finished records.
         shown = git(root, "show", f"HEAD:{path}/status.json")
         if shown.returncode:
-            continue  # Removed by this change, for example when sweeping finished records.
-        status, problem = parse_status(shown.stdout)
+            status, problem = None, "status.json is missing"
+        else:
+            status, problem = parse_status(shown.stdout)
         records.append({"name": name, "path": path, "status": status, "problem": problem})
         # The SOT may lead the implementation; only an implementation that moves alone is a divergence risk.
         if problem:

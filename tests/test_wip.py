@@ -186,6 +186,16 @@ class WipTests(unittest.TestCase):
         self.commit("broken record")
         self.assertIn(("invalid-status", "20261002-broken"), self.codes())
 
+    def test_check_pr_reports_a_record_without_its_status_file(self):
+        self.git("switch", "-qc", "feat")
+        self.write("wip/20261001-partial/work.md", "# partial\n")
+        self.write("wip/.drafts/note.md", "not a record\n")
+        self.write("src/app.py", "change = 1\n")
+        self.commit("record without status")
+        result = self.check()
+        self.assertEqual([(item["code"], item["record"], item["detail"]) for item in result["findings"]],
+                         [("invalid-status", "20261001-partial", "status.json is missing")])
+
     def test_check_pr_uses_settings_and_ignores_unrelated_changes(self):
         self.write(".hq/v2/settings.json", {"sdd": {"path": "spec"}, "wip": {"path": "work"}})
         self.commit("settings")

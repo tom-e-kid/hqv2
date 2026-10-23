@@ -3,6 +3,7 @@
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -101,6 +102,49 @@ class SotCheckHookTests(unittest.TestCase):
         self.git("rm", "-rq", "wip")
         self.commit("no records")
         self.assertIsNone(self.run_hook(self.bash("gh pr create")))
+
+    def work_tree(self):
+        """Keep records on develop and diverge on a separate work tree, as HQ's worktree flow does."""
+        self.write("wip/20260901-earlier/status.json", {"status": "active", "sotImpact": False, "prs": []})
+        self.commit("records on the base")
+        tree = Path(self.tmp.name) / "trees" / "feat"
+        self.git("worktree", "add", "-q", "-b", "feat", str(tree))
+        for name, content in (("wip/20261001-impact/status.json", json.dumps({"status": "active", "sotImpact": True, "prs": []})),
+                              ("src/app.py", "change = 1\n")):
+            (tree / name).parent.mkdir(parents=True, exist_ok=True)
+            (tree / name).write_text(content)
+        self.git("-C", str(tree), "add", "-A")
+        self.git("-C", str(tree), "commit", "-qm", "implementation only")
+        return tree
+
+    def test_command_directory_is_followed(self):
+        tree = self.work_tree()
+        for command in (f"cd {shlex.quote(str(tree))} && gh pr create --base develop",
+                        "cd ../trees/feat; git push -u origin feat && gh pr create --base develop"):
+            self.assertIn("sot-not-updated", self.run_hook(self.bash(command)))
+        mcp = {"tool_name": "mcp__github__create_pull_request", "tool_input": {"base": "develop", "head": "feat"}}
+        self.assertIn("sot-not-updated", self.run_hook({**mcp, "cwd": str(tree)}))
+
+    def test_unresolved_source_is_reported_as_not_checked(self):
+        tree = self.work_tree()
+        mcp = {"tool_name": "mcp__github__create_pull_request", "tool_input": {"base": "develop", "head": "feat"}}
+        for event, reason in (
+                (self.bash("gh pr create --base develop"), "no commits ahead"),
+                (self.bash('cd "$TREE" && gh pr create --base develop'), "directory"),
+                (self.bash(f"(cd {shlex.quote(str(tree))} && make) && gh pr create --base develop"), "directory"),
+                (self.bash("gh pr create --head feat --base develop"), "PR head"),
+                (mcp, "PR head"),
+                (self.bash("gh pr create -R owner/repo --base develop"), "--repo"),
+                (self.bash("gh pr create --body 'unbalanced"), "parsed")):
+            message = self.run_hook(event)
+            self.assertIn("not run", message)
+            self.assertIn(reason, message)
+            self.assertNotIn(str(self.repo), message)
+        # A command that only mentions PR creation in its text does not create one.
+        self.assertIsNone(self.run_hook(self.bash('git commit -m "gh pr create later"')))
+        self.git("rm", "-rq", "wip")
+        self.commit("no records")
+        self.assertIsNone(self.run_hook(self.bash('cd "$TREE" && gh pr create --base develop')))
 
     def test_invalid_settings_are_reported(self):
         self.diverging_branch()

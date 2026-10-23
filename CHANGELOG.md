@@ -6,7 +6,7 @@
 
 ### Added
 
-- SOT と実装の乖離を防ぐ PR 作成前の確認。`scripts/wip.py check-pr` が、変更に含まれる作業記録の `sotImpact` と SOT の変更を突き合わせ、SOT への影響ありなのに実装だけが変わった変更などを指摘する。SOT が先に変わった変更は指摘しない。pr・git・wip の手順で PR 作成前に確認し、Codex・Claude Code の `PreToolUse` Hook がエージェントの PR 作成時に同じ判定を伝える。PR 作成は止めない。
+- SOT と実装の乖離を防ぐ PR 作成前の確認。`scripts/wip.py check-pr` が、変更に含まれる作業記録の `sotImpact` と SOT の変更を突き合わせ、SOT への影響ありなのに実装だけが変わった変更などを指摘する。SOT が先に変わった変更は指摘しない。pr・git・wip の手順で PR 作成前に確認し、Codex・Claude Code の `PreToolUse` Hook がエージェントの PR 作成時に同じ判定を伝える。作成元の checkout を特定できない場合は、未確認であることを伝える。PR 作成は止めない。
 
 - SOT の文書の場所を共有設定 `.hq/v2/settings.json` の `sdd.path`（未指定は `docs`）で変更できるようにした。sdd・wip・PR 作成前の確認が同じ設定に従う。
 

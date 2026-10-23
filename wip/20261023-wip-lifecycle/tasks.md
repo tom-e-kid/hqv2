@@ -41,6 +41,7 @@ PR (2): `sdd.path` と PR 作成前チェック
 - [x] pr Skill（git・wip からも参照）と PreToolUse Hook（両製品）を追加し、Hook の入出力テストを書く。PR 作成の検出は `hooks/pr_event.py` に共通化し、pr-feedback の Hook も使う。Claude Code の公式文書で、PreToolUse の `additionalContext` は実行結果とともに届き、決定を返さなければ通常の権限の流れが続くことを確認した。
 - [x] README の Hook の全体像・保存先の設定・構成、共通の規則（`docs/work-records.md` の PR 作成前の確認）、検証手順、CHANGELOG、Codex マニフェストを更新する。
 - [x] 検証して PR (2) を作成する（[PR #22](https://github.com/tom-e-kid/hqv2/pull/22)）。
+- [x] PR #22 のレビュー指摘2件に対応する（2026-10-24）。`status.json` だけが欠けた記録を、記録の削除と区別して `invalid-status` にした。Hook は `cd` の移動先と `--head`・MCP の `head` から PR を作る checkout を判定し、作成元を特定できない場合や判定先に取り込み先より先のコミットがない場合は未確認と伝えるようにした。
 
 ## 検証・結果
 
@@ -53,10 +54,12 @@ PR (2): `sdd.path` と PR 作成前チェック
 | 管理外のファイルを含む記録 | 一時リポジトリで無視対象 `evidence.local` を置いて再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は未追跡・無視対象・隠しファイルのいずれも `changed` |
 | ステージ済みの変更を含む記録 | 一時リポジトリで、編集をステージしてから作業ファイルだけ元に戻した状態（`MM`）を再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は `changed`。新しいテストは修正前のコードで失敗する |
 | `check-pr` と `sdd.path` | `tests/test_wip.py`（追加4件） | 成功。実装だけの変更で `sot-not-updated`、SOT の更新で解消、SOT が先行する変更は指摘なし、記録なしの SOT 変更・判断のずれ・不正な状態を指摘、設定した `sdd.path`・`wip.path` を使う、記録を削除する変更と未コミットの変更は対象外 |
-| PreToolUse Hook の入出力 | `tests/test_sot_check.py`（5件） | 成功。PR 作成以外は無出力、拒否を返さず `additionalContext` だけ、`--base`・MCP の `base`・作業ブランチの記録・共有設定から取り込み先を決める、取り込み先不明は記録がある場合だけ伝える、不正な設定を伝える |
+| PreToolUse Hook の入出力 | `tests/test_sot_check.py`（7件） | 成功。PR 作成以外は無出力、拒否を返さず `additionalContext` だけ、`--base`・MCP の `base`・作業ブランチの記録・共有設定から取り込み先を決める、取り込み先不明は記録がある場合だけ伝える、不正な設定を伝える |
+| PR を作る checkout の判定（PR #22 の指摘） | 一時リポジトリで基準 checkout から `cd <worktree> && gh pr create` を再現し、修正後にテストで確認。このリポジトリでも主 checkout を cwd として実行 | 修正前は基準 checkout を判定して無通知、修正後は worktree を判定して `sot-not-updated`。`$変数` への移動・サブシェル・`--head` の不一致・`--repo`・解析できないコマンド・先行コミットのない checkout は未確認と伝える。新しいテストは修正前のコードで失敗する |
+| 状態ファイルだけが欠けた記録（PR #22 の指摘） | `tests/test_wip.py`（追加1件） | 修正前は指摘なし、修正後は `invalid-status`（`status.json is missing`）。記録全体の削除と `.` で始まるディレクトリは従来どおり対象外 |
 | 製品内での `sweep` の実行 | 新しいセッションでの依頼 | 未実施 |
 | 製品内での PreToolUse Hook | 両製品の新しいセッションでの PR 作成 | 未実施 |
 
 ## 中断・再開と完了
 
-現在地: PR (1) は #21 で取り込み済み。PR (2) を #22 として提出し、レビュー・取り込み待ち。取り込み後に、両製品での `sweep` と PreToolUse Hook の確認が残る。
+現在地: PR (1) は #21 で取り込み済み。PR (2) を #22 として提出し、レビュー指摘2件に対応した。再レビュー・取り込み待ち。取り込み後に、両製品での `sweep` と PreToolUse Hook の確認が残る。
