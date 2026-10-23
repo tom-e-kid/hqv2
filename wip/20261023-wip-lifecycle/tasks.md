@@ -1,6 +1,6 @@
 # 作業と現在地
 
-状態: PR (2) の実装中
+状態: PR (2) のレビュー待ち
 
 概要: 作業記録に状態ファイルと SOT への影響の判断を導入し、完了記録の削除を共通 Skill `sweep` に任せ、PR 作成前に SOT への影響の判断と SOT の変更を突き合わせる。要求の書式も見直す。
 
@@ -40,7 +40,7 @@ PR (2): `sdd.path` と PR 作成前チェック
 - [x] `scripts/wip.py check-pr` とテストを追加する。判定は SOT と実装の乖離の検出を目的とし、向きを持たせる（設計 F）。判定は `sot-not-updated`・`impact-mismatch`・`sot-without-record`・`invalid-status`。
 - [x] pr Skill（git・wip からも参照）と PreToolUse Hook（両製品）を追加し、Hook の入出力テストを書く。PR 作成の検出は `hooks/pr_event.py` に共通化し、pr-feedback の Hook も使う。Claude Code の公式文書で、PreToolUse の `additionalContext` は実行結果とともに届き、決定を返さなければ通常の権限の流れが続くことを確認した。
 - [x] README の Hook の全体像・保存先の設定・構成、共通の規則（`docs/work-records.md` の PR 作成前の確認）、検証手順、CHANGELOG、Codex マニフェストを更新する。
-- [ ] 検証して PR (2) を作成する。
+- [x] 検証して PR (2) を作成する（[PR #22](https://github.com/tom-e-kid/hqv2/pull/22)）。
 
 ## 検証・結果
 
@@ -59,4 +59,4 @@ PR (2): `sdd.path` と PR 作成前チェック
 
 ## 中断・再開と完了
 
-現在地: PR (1) は #21 で取り込み済み。PR (2) を実装・検証中。
+現在地: PR (1) は #21 で取り込み済み。PR (2) を #22 として提出し、レビュー・取り込み待ち。取り込み後に、両製品での `sweep` と PreToolUse Hook の確認が残る。
