@@ -440,18 +440,80 @@ class SecurityTests(unittest.TestCase):
         for name in HOOK_NAMES:
             self.assertFalse((hooks / name).exists())
 
-    def test_session_hook_is_read_only_and_quiet_when_ready(self):
+    def test_install_and_uninstall_are_repeatable(self):
+        result = self.setup_hook("uninstall")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not installed", result.stdout)
+        for _ in range(2):
+            result = self.setup_hook()
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("status=ready", result.stdout)
+        hooks = self.repo / ".git/hooks"
+        current = (hooks / "pre-commit").read_bytes()
+        # An earlier HQ copy, a lost exec bit and a missing scanner copy all converge to ready.
+        (hooks / "pre-commit").write_text(V1_HOOK)
+        (hooks / "pre-merge-commit").chmod(0o644)
+        shutil.rmtree(self.repo / ".git/hq-commit-security")
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "damaged")
+        self.assertEqual(self.setup_hook().returncode, 0)
+        self.assertEqual(self.setup_hook("status").stdout.strip(), "ready")
+        for name in HOOK_NAMES:
+            self.assertEqual((hooks / name).read_bytes(), current)
+            self.assertTrue(os.access(hooks / name, os.X_OK))
+        # A hand-edited hook still stops install before anything changes.
+        edited = hooks / "pre-applypatch"
+        edited.write_bytes(current + b"# local edit\n")
+        self.assertEqual(self.setup_hook().returncode, 2)
+        self.assertTrue(edited.read_bytes().endswith(b"# local edit\n"))
+        edited.write_bytes(current)
+        for _ in range(2):
+            result = self.setup_hook("uninstall")
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not installed", result.stdout)
+        self.assertFalse(any((hooks / name).exists() for name in HOOK_NAMES))
+        # Exact HQ leftovers without the scanner copy are removed; other hooks are kept.
+        (hooks / "pre-commit").write_bytes(current)
+        other = hooks / "pre-merge-commit"
+        other.write_text("#!/bin/sh\nexit 0\n")
+        self.assertEqual(self.setup_hook("uninstall").returncode, 0)
+        self.assertFalse((hooks / "pre-commit").exists())
+        self.assertTrue(other.is_file())
+
+    def session_start(self):
         event = json.dumps({"hook_event_name": "SessionStart", "cwd": str(self.repo)})
         result = self.run_command([sys.executable, str(STATUS_HOOK)], input=event)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn(str(self.repo), result.stdout)
+        if not result.stdout:
+            return None
         message = json.loads(result.stdout)["hookSpecificOutput"]
         self.assertEqual(message["hookEventName"], "SessionStart")
-        self.assertIn("not-installed", message["additionalContext"])
-        self.assertNotIn(str(self.repo), result.stdout)
+        return message["additionalContext"]
+
+    def test_session_hook_reminds_only_declared_repositories(self):
+        # Without a declaration, not installing is a valid choice.
+        self.assertIsNone(self.session_start())
+        self.write(".hq/v2/settings.json", json.dumps({"git": {}, "commitSecurity": {"required": True}}))
+        self.assertIn("not-installed", self.session_start())
+        local = ".hq/v2/.ignore/settings.json"
+        self.write(local, json.dumps({"commitSecurity": {"required": False}}))
+        self.assertIsNone(self.session_start())
+        # A malformed declaration is reported instead of falling back silently.
+        for content in ('{"commitSecurity": {"required": "yes"}}', "{", "[]"):
+            self.write(local, content)
+            self.assertIn('{"required": true}', self.session_start())
+        (self.repo / local).unlink()
         self.assertFalse((self.repo / ".git/hq-commit-security").exists())
         self.assertEqual(self.setup_hook().returncode, 0)
-        result = self.run_command([sys.executable, str(STATUS_HOOK)], input=event)
-        self.assertEqual(result.returncode, 0)
-        self.assertEqual(result.stdout, "")
+        self.assertIsNone(self.session_start())
+        # Breakage of an installed guard is reported regardless of the declaration.
+        self.write(".hq/v2/settings.json", json.dumps({"commitSecurity": {"required": False}}))
+        (self.repo / ".git/hooks/pre-applypatch").chmod(0o644)
+        self.assertIn("hook-missing-or-modified", self.session_start())
+        # Leftover HQ hooks without the scanner copy block commits, so they are not mere absence.
+        (self.repo / ".hq/v2/settings.json").unlink()
+        shutil.rmtree(self.repo / ".git/hq-commit-security")
+        self.assertIn("damaged", self.session_start())
 
 
 if __name__ == "__main__":

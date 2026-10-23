@@ -75,7 +75,8 @@ def hook_version(candidate):
 def status(cwd):
     _, payload, hook = locations(cwd)
     if not payload.exists() and not payload.is_symlink():
-        return "not-installed"
+        # A leftover HQ hook blocks every commit without the copy, so it is breakage rather than absence.
+        return "damaged" if any(hook_version(hook.parent / name) for name in HOOK_NAMES) else "not-installed"
     try:
         data = metadata(payload)
     except SetupError:
@@ -118,7 +119,8 @@ def setup(cwd, action):
     if action == "install":
         if hooks_path_set(cwd):
             raise SetupError("Existing core.hooksPath preserved. Use prepare and integrate the check into your hook manager")
-        if any((hook.parent / name).exists() or (hook.parent / name).is_symlink() for name in HOOK_NAMES):
+        # Exact HQ copies may be refreshed; any other hook or link stays untouched.
+        if any(foreign(hook.parent / name) for name in HOOK_NAMES):
             raise SetupError(
                 "Existing Git hook preserved. Move it into <hook>.d/ to run it before the check, "
                 "or use prepare and integrate the check into your hook manager"
@@ -133,10 +135,17 @@ def setup(cwd, action):
     atomic_write(payload / "manifest.json", (json.dumps({"owner": OWNER, "sha256": fingerprint(source)}, indent=2) + "\n").encode(), 0o644)
     if action == "install":
         hook.parent.mkdir(exist_ok=True)
-        # Exclusive creation also prevents overwriting a concurrently installed hook.
         for name in HOOK_NAMES:
+            candidate = hook.parent / name
+            version = hook_version(candidate)
+            if version is not None:
+                # Refresh an earlier copy or a lost exec bit so a repeated install converges to ready.
+                if version == "previous" or not os.access(candidate, os.X_OK):
+                    atomic_write(candidate, HOOK.read_bytes(), 0o755)
+                continue
+            # Exclusive creation also prevents overwriting a concurrently installed hook.
             try:
-                fd = os.open(hook.parent / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o755)
+                fd = os.open(candidate, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o755)
             except FileExistsError:
                 raise SetupError("Another Git hook appeared; it was preserved. Check setup status") from None
             with os.fdopen(fd, "wb") as stream:
@@ -155,15 +164,34 @@ def setup(cwd, action):
         print("Manual integration must be verified with a failing test commit in an isolated repository")
 
 
+def foreign(candidate):
+    return (candidate.exists() or candidate.is_symlink()) and hook_version(candidate) is None
+
+
+def report_kept_steps(hook):
+    # Steps are repository-owned, so they are kept; without the HQ hook nothing runs them.
+    for name in HOOK_NAMES:
+        if (hook.parent / f"{name}.d").exists():
+            print(f"Kept {name}.d/; its steps no longer run")
+
+
 def uninstall(cwd):
     _, payload, hook = locations(cwd)
+    if not payload.exists() and not payload.is_symlink():
+        # Nothing copied: remove only exact HQ hook leftovers so a repeated uninstall converges.
+        leftovers = [hook.parent / name for name in HOOK_NAMES if hook_version(hook.parent / name)]
+        if leftovers and hook.parent.is_symlink():
+            raise SetupError("External Git hooks directory preserved; remove HQ integration manually")
+        for candidate in leftovers:
+            candidate.unlink()
+        print("OK: HQ commit security is not installed")
+        report_kept_steps(hook)
+        return
     metadata(payload)
     if hook.parent.is_symlink():
         raise SetupError("External Git hooks directory preserved; remove HQ integration manually")
-    for name in HOOK_NAMES:
-        candidate = hook.parent / name
-        if candidate.is_symlink() or (candidate.exists() and hook_version(candidate) is None):
-            raise SetupError("Existing Git hook preserved; remove HQ integration manually")
+    if any(foreign(hook.parent / name) for name in HOOK_NAMES):
+        raise SetupError("Existing Git hook preserved; remove HQ integration manually")
     # External hook managers may still call this copy; do not silently remove it.
     if hooks_path_set(cwd):
         raise SetupError("External hook configuration preserved; remove integration before deleting the payload")
@@ -177,10 +205,7 @@ def uninstall(cwd):
         (payload / name).unlink()
     payload.rmdir()
     print("OK: HQ Git hook and copied scanner removed")
-    # Steps are repository-owned, so they are kept; without the HQ hook nothing runs them.
-    for name in HOOK_NAMES:
-        if (hook.parent / f"{name}.d").exists():
-            print(f"Kept {name}.d/; its steps no longer run")
+    report_kept_steps(hook)
 
 
 def main():
