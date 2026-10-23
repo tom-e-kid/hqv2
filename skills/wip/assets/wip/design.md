@@ -4,7 +4,7 @@
 
 ## 要求との対応
 
-[要求](requirements.md) に対する実現方法を記載する。
+[要求](requirements.md) の Goal・Done When に対する実現方法を記載する。Context と Constraints を前提とし、要求の内容を設計判断として書き直さない。
 
 ## 実現方法と判断理由
 

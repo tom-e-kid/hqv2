@@ -1,7 +1,7 @@
 # 作業メモの週次整理を試行する
 
 概要: HQ 開発専用 Skill に作業メモの評価・分類・整理・PR 提出手順を定義し、週次実行で試す。
-状態: Skill の実装・静的検証済み。週次タスクを登録済み。[PR #17](https://github.com/tom-e-kid/hqv2/pull/17) を develop 向けに提出し、取り込み待ち。定期実行での実動作は未検証。
+状態: Skill の実装・静的検証済み。週次タスクを登録済み。[PR #17](https://github.com/tom-e-kid/hqv2/pull/17) で develop へ取り込み済み。定期実行での実動作は未検証。2026-10-23 の作業（`wip/20261023-wip-lifecycle/`）で、共通 Skill `sweep` を参照する入口に作り直す。
 
 ## 要求と合意
 
