@@ -50,6 +50,7 @@ PR (2): `sdd.path` と PR 作成前チェック
 | このリポジトリの記録の状態ファイル | `scripts/validate.py` | 成功。不正・欠落を検出することも確認 |
 | 構造・参照・Skill・配布設定 | `scripts/validate.py`、アンカー照合、`quick_validate.py`（Skill 10件）、`python3 -m unittest discover -s tests`（113件）、`claude plugin validate .`、Codex のカタログ確認 | 成功。`claude plugin validate` の警告は develop と同じ既知のもののみ |
 | 管理外のファイルを含む記録 | 一時リポジトリで無視対象 `evidence.local` を置いて再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は未追跡・無視対象・隠しファイルのいずれも `changed` |
+| ステージ済みの変更を含む記録 | 一時リポジトリで、編集をステージしてから作業ファイルだけ元に戻した状態（`MM`）を再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は `changed`。新しいテストは修正前のコードで失敗する |
 | 製品内での `sweep` の実行 | 新しいセッションでの依頼 | 未実施 |
 
 ## 中断・再開と完了

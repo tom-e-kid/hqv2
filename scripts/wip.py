@@ -101,9 +101,10 @@ def classify(root, base, record):
     status, problem = parse_status(on_base.stdout)
     if problem or status["status"] != "done":
         return "waiting", "the base revision does not have the done state yet"
-    # Any later edit, staged or not, means the final record is not what the base holds.
-    if git(root, "diff", "--quiet", base, "--", record["path"]).returncode:
-        return "changed", "the record differs from the base revision"
+    # Compare both the working tree and the index: a staged edit can hide behind a reverted file.
+    for scope in ((), ("--cached",)):
+        if git(root, "diff", "--quiet", *scope, base, "--", record["path"]).returncode:
+            return "changed", "the record differs from the base revision"
     # Compare the disk with tracked files: Git status hides ignored files such as local evidence.
     tracked = git(root, "ls-files", "-z", "--", record["path"])
     if tracked.returncode:

@@ -117,6 +117,12 @@ class WipTests(unittest.TestCase):
         self.assertEqual(rows["20261003-active"]["result"], "not-done")
         self.assertEqual(rows["20261004-missing"]["result"], "invalid")
         self.git("checkout", "--", "wip/20261001-edited/work.md")
+        # A staged edit stays unsaved even when the working file matches the base again.
+        self.write("wip/20261001-edited/work.md", "# staged edit\n")
+        self.git("add", "wip/20261001-edited/work.md")
+        self.write("wip/20261001-edited/work.md", "# 20261001-edited\n")
+        self.assertEqual(self.results("sweepable", "--base", "develop")["20261001-edited"]["result"], "changed")
+        self.git("reset", "-q", "--", "wip/20261001-edited/work.md")
         # Untracked, ignored and hidden files would be lost by deleting the directory.
         self.write(".gitignore", "*.local\n")
         self.commit("ignore local files")
