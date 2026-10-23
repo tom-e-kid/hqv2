@@ -43,8 +43,8 @@ class WipTests(unittest.TestCase):
         self.git("add", "-A")
         self.git("commit", "-qm", message)
 
-    def record(self, name, status="active", weight=2, prs=(), root="wip"):
-        self.write(f"{root}/{name}/status.json", {"status": status, "weight": weight, "prs": list(prs)})
+    def record(self, name, status="active", sot=False, prs=(), root="wip"):
+        self.write(f"{root}/{name}/status.json", {"status": status, "sotImpact": sot, "prs": list(prs)})
         self.write(f"{root}/{name}/work.md", f"# {name}\n")
 
     def run_script(self, *args):
@@ -60,19 +60,19 @@ class WipTests(unittest.TestCase):
     def test_list_reports_states_and_problems(self):
         self.assertEqual(self.results("list"), {})
         self.record("20261001-active", prs=[3])
-        self.record("20261002-done", status="done", weight=3)
+        self.record("20261002-done", status="done", sot=True)
         self.write("wip/20261003-missing/work.md", "# missing\n")
         self.write("wip/20261004-broken/status.json", "{")
-        self.write("wip/20261005-weight/status.json", {"status": "active", "weight": 4, "prs": []})
-        self.write("wip/20261006-prs/status.json", {"status": "paused", "weight": 1, "prs": ["#3"]})
-        self.write("wip/20261007-status/status.json", {"status": "finished", "weight": 1})
+        self.write("wip/20261005-impact/status.json", {"status": "active", "sotImpact": "yes", "prs": []})
+        self.write("wip/20261006-prs/status.json", {"status": "paused", "sotImpact": False, "prs": ["#3"]})
+        self.write("wip/20261007-status/status.json", {"status": "finished", "sotImpact": True})
         self.write("wip/notes.md", "not a record\n")
         rows = self.results("list")
-        self.assertEqual(rows["20261001-active"]["status"], {"status": "active", "weight": 2, "prs": [3]})
+        self.assertEqual(rows["20261001-active"]["status"], {"status": "active", "sotImpact": False, "prs": [3]})
         self.assertIsNone(rows["20261002-done"]["problem"])
         self.assertIn("missing", rows["20261003-missing"]["problem"])
         self.assertIn("JSON", rows["20261004-broken"]["problem"])
-        self.assertIn("weight", rows["20261005-weight"]["problem"])
+        self.assertIn("sotImpact", rows["20261005-impact"]["problem"])
         self.assertIn("prs", rows["20261006-prs"]["problem"])
         self.assertIn("status", rows["20261007-status"]["problem"])
         self.assertNotIn("notes.md", rows)

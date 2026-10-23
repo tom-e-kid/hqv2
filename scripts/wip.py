@@ -8,7 +8,6 @@ import subprocess
 import sys
 
 STATUSES = ("active", "paused", "done")
-WEIGHTS = (1, 2, 3)
 DEFAULT_PATH = "wip"
 
 
@@ -63,12 +62,12 @@ def parse_status(text):
         return None, "status.json must be an object"
     if data.get("status") not in STATUSES:
         return None, "status must be active, paused or done"
-    if not is_number(data.get("weight")) or data["weight"] not in WEIGHTS:
-        return None, "weight must be 1, 2 or 3"
+    if not isinstance(data.get("sotImpact"), bool):
+        return None, "sotImpact must be true or false"
     prs = data.get("prs", [])
     if not isinstance(prs, list) or not all(is_number(n) and n > 0 for n in prs):
         return None, "prs must be a list of PR numbers"
-    return {"status": data["status"], "weight": data["weight"], "prs": prs}, None
+    return {"status": data["status"], "sotImpact": data["sotImpact"], "prs": prs}, None
 
 
 def records(root):
@@ -164,11 +163,11 @@ def main():
     table = []
     for row in rows:
         status = row["status"] or {}
-        table.append({"name": row["name"], "status": status.get("status", "-"), "weight": status.get("weight", "-"),
+        table.append({"name": row["name"], "status": status.get("status", "-"), "sot": {True: "yes", False: "no"}.get(status.get("sotImpact"), "-"),
                       "prs": ",".join(f"#{n}" for n in status.get("prs", [])) or "-",
                       "note": row.get("detail") if args.action == "sweepable" else (row["problem"] or ""),
                       "result": row.get("result", "")})
-    columns = [("NAME", "name"), ("STATUS", "status"), ("WEIGHT", "weight"), ("PRS", "prs")]
+    columns = [("NAME", "name"), ("STATUS", "status"), ("SOT", "sot"), ("PRS", "prs")]
     columns += [("RESULT", "result"), ("DETAIL", "note")] if args.action == "sweepable" else [("PROBLEM", "note")]
     show(table, columns)
     return 0
