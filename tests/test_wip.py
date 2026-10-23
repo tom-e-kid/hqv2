@@ -144,6 +144,78 @@ class WipTests(unittest.TestCase):
                                 capture_output=True, text=True, env=self.env)
         self.assertEqual(result.returncode, 2)
 
+    def check(self, base="develop"):
+        result = self.run_script("check-pr", "--base", base)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def codes(self, base="develop"):
+        return sorted((item["code"], item["record"]) for item in self.check(base)["findings"])
+
+    def test_check_pr_flags_implementation_that_moves_without_the_sot(self):
+        self.write("docs/PRD.md", "# PRD\n")
+        self.commit("sot")
+        self.git("switch", "-qc", "feat")
+        self.record("20261001-impact", sot=True)
+        self.write("src/app.py", "change = 1\n")
+        self.commit("implementation only")
+        self.assertEqual(self.codes(), [("sot-not-updated", "20261001-impact")])
+        # Updating the SOT in the same change resolves it.
+        self.write("docs/PRD.md", "# PRD\nupdated\n")
+        self.commit("sot updated")
+        result = self.check()
+        self.assertTrue(result["sotChanged"])
+        self.assertEqual(result["findings"], [])
+
+    def test_check_pr_accepts_an_sot_that_leads_the_implementation(self):
+        self.git("switch", "-qc", "feat")
+        self.record("20261001-plan", sot=True)
+        self.write("docs/PRD.md", "# PRD\nnext goal\n")
+        self.commit("sot first")
+        self.assertEqual(self.codes(), [])
+
+    def test_check_pr_reports_judgment_and_missing_records(self):
+        self.git("switch", "-qc", "feat")
+        self.write("docs/PRD.md", "# PRD\n")
+        self.commit("sot without record")
+        self.assertEqual(self.codes(), [("sot-without-record", None)])
+        self.record("20261001-small", sot=False)
+        self.commit("record says no impact")
+        self.assertEqual(self.codes(), [("impact-mismatch", "20261001-small")])
+        self.write("wip/20261002-broken/status.json", "{")
+        self.commit("broken record")
+        self.assertIn(("invalid-status", "20261002-broken"), self.codes())
+
+    def test_check_pr_uses_settings_and_ignores_unrelated_changes(self):
+        self.write(".hq/v2/settings.json", {"sdd": {"path": "spec"}, "wip": {"path": "work"}})
+        self.commit("settings")
+        self.git("switch", "-qc", "feat")
+        self.record("20261001-impact", sot=True, root="work")
+        self.write("docs/notes.md", "not the SOT here\n")
+        self.commit("docs is ordinary content")
+        self.assertEqual(self.codes(), [("sot-not-updated", "20261001-impact")])
+        self.write("spec/PRD.md", "# PRD\n")
+        self.commit("configured SOT")
+        self.assertEqual(self.codes(), [])
+        # Only committed changes count, and a record removed by the change is skipped.
+        self.git("switch", "-q", "develop")
+        self.git("switch", "-qc", "sweep")
+        self.record("20261009-done", status="done", sot=True, root="work")
+        self.commit("done record")
+        self.git("switch", "-q", "develop")
+        self.git("merge", "-q", "--no-ff", "-m", "merge", "sweep")
+        self.git("switch", "-qc", "cleanup")
+        self.git("rm", "-rq", "work/20261009-done")
+        self.commit("sweep")
+        self.write("src/uncommitted.py", "pending = 1\n")
+        self.assertEqual(self.check()["records"], [])
+        self.assertEqual(self.codes(), [])
+        for value in ("../x", "/abs"):
+            self.write(".hq/v2/settings.json", {"sdd": {"path": value}})
+            result = self.run_script("check-pr", "--base", "develop")
+            self.assertEqual(result.returncode, 2)
+            self.assertIn("sdd.path", result.stderr)
+
     def test_text_output_lists_records(self):
         self.record("20261001-task", prs=[3, 4])
         result = subprocess.run([sys.executable, str(SCRIPT), "list", "--repo", str(self.repo)],

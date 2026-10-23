@@ -23,7 +23,7 @@
 
 ## 文書の配置
 
-大枠は docs/PRD.md・FDS.md・ADD.md を基本とし、既存の同等文書を優先する。REPO・DEV・GLOSSARY は必要に応じて独立させる。
+大枠は docs/PRD.md・FDS.md・ADD.md を基本とし（`.hq/v2/settings.json` の `sdd.path` で場所を変えた場合は、そのパスに書き換える）、既存の同等文書を優先する。REPO・DEV・GLOSSARY は必要に応じて独立させる。
 
 作業記録は `wip/YYYYMMDD-<作業名>/` に置く（`.hq/v2/settings.json` の `wip.path` で場所を変えた場合は、そのパスに書き換える）。状態・docs/ への影響・PR 番号は `status.json` に残す。docs/ の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断する。要求は Goal・Context・Constraints・Done When で書く。完了・取りやめた記録は継続して必要な内容を関連文書へ反映してから削除する。完了にした PR では削除せず、取り込み後の別の変更で削除する。要求・設計・タスクは分割を標準とし、短い内容は節を分けて統合してよい。作業単位はセッション単位ではない。
 

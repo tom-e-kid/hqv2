@@ -1,6 +1,6 @@
 # 作業と現在地
 
-状態: PR (1) のレビュー待ち。PR (2) は未着手
+状態: PR (2) の実装中
 
 概要: 作業記録に状態ファイルと SOT への影響の判断を導入し、完了記録の削除を共通 Skill `sweep` に任せ、PR 作成前に SOT への影響の判断と SOT の変更を突き合わせる。要求の書式も見直す。
 
@@ -36,10 +36,11 @@ PR (1): 状態・SOT への影響・書式・スクリプト・`sweep`・work-ma
 
 PR (2): `sdd.path` と PR 作成前チェック
 
-- [ ] `sdd.path` を追加し、sdd・wip・検証スクリプトを対応させる。
-- [ ] `scripts/wip.py check-pr` とテストを追加する。判定は SOT と実装の乖離の検出を目的とし、向きを持たせる（設計 F）。
-- [ ] pr Skill と PreToolUse Hook（両製品）を追加し、Hook の入出力テストを書く。
-- [ ] README の Hook の全体像などを更新し、検証して PR (2) を作成する。
+- [x] `sdd.path` を追加し、sdd・wip・検証スクリプトを対応させる。
+- [x] `scripts/wip.py check-pr` とテストを追加する。判定は SOT と実装の乖離の検出を目的とし、向きを持たせる（設計 F）。判定は `sot-not-updated`・`impact-mismatch`・`sot-without-record`・`invalid-status`。
+- [x] pr Skill（git・wip からも参照）と PreToolUse Hook（両製品）を追加し、Hook の入出力テストを書く。PR 作成の検出は `hooks/pr_event.py` に共通化し、pr-feedback の Hook も使う。Claude Code の公式文書で、PreToolUse の `additionalContext` は実行結果とともに届き、決定を返さなければ通常の権限の流れが続くことを確認した。
+- [x] README の Hook の全体像・保存先の設定・構成、共通の規則（`docs/work-records.md` の PR 作成前の確認）、検証手順、CHANGELOG、Codex マニフェストを更新する。
+- [ ] 検証して PR (2) を作成する。
 
 ## 検証・結果
 
@@ -51,8 +52,11 @@ PR (2): `sdd.path` と PR 作成前チェック
 | 構造・参照・Skill・配布設定 | `scripts/validate.py`、アンカー照合、`quick_validate.py`（Skill 10件）、`python3 -m unittest discover -s tests`（113件）、`claude plugin validate .`、Codex のカタログ確認 | 成功。`claude plugin validate` の警告は develop と同じ既知のもののみ |
 | 管理外のファイルを含む記録 | 一時リポジトリで無視対象 `evidence.local` を置いて再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は未追跡・無視対象・隠しファイルのいずれも `changed` |
 | ステージ済みの変更を含む記録 | 一時リポジトリで、編集をステージしてから作業ファイルだけ元に戻した状態（`MM`）を再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は `changed`。新しいテストは修正前のコードで失敗する |
+| `check-pr` と `sdd.path` | `tests/test_wip.py`（追加4件） | 成功。実装だけの変更で `sot-not-updated`、SOT の更新で解消、SOT が先行する変更は指摘なし、記録なしの SOT 変更・判断のずれ・不正な状態を指摘、設定した `sdd.path`・`wip.path` を使う、記録を削除する変更と未コミットの変更は対象外 |
+| PreToolUse Hook の入出力 | `tests/test_sot_check.py`（5件） | 成功。PR 作成以外は無出力、拒否を返さず `additionalContext` だけ、`--base`・MCP の `base`・作業ブランチの記録・共有設定から取り込み先を決める、取り込み先不明は記録がある場合だけ伝える、不正な設定を伝える |
 | 製品内での `sweep` の実行 | 新しいセッションでの依頼 | 未実施 |
+| 製品内での PreToolUse Hook | 両製品の新しいセッションでの PR 作成 | 未実施 |
 
 ## 中断・再開と完了
 
-現在地: PR (1) を #21 として提出し、レビュー・取り込み待ち。取り込み後に PR (2) へ進む。
+現在地: PR (1) は #21 で取り込み済み。PR (2) を実装・検証中。

@@ -122,7 +122,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | 実行するもの | Codex・Claude Code | Git |
 | 対象 | そのセッションでのエージェントの操作 | 人・IDE・エージェントを問わない、そのリポジトリの Git 操作 |
 | 有効になる条件 | Plugin の読み込み。Codex は Hook 定義の信頼も必要 | clone ごとの導入 |
-| HQ での用途 | 状態の通知、AI レビュー対応の継続 | 問題のあるコミットの停止 |
+| HQ での用途 | 状態の通知、PR 作成時の SOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
 
 開発の流れの中で HQ の Hook が動く箇所です。
 
@@ -132,7 +132,8 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git | 同上 | 項目 7 の導入 |
-| PR 作成 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
+| PR 作成時 | `PreToolUse` | Plugin | 変更に含まれる作業記録の SOT への影響と SOT の変更を突き合わせ、乖離のおそれがあればモデルへ伝える。PR 作成は止めず、注意は実行結果とともに届く | 作業記録を使うリポジトリ |
+| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
 | 中断 | `Interrupt` | Plugin（Codex のみ） | 監視の中断を記録 | 監視の登録 |
 | セッション終了 | `SessionEnd` | Plugin | 監視を停止 | 監視の登録 |
@@ -157,7 +158,7 @@ HQ は checkout 固有の設定、worktree、AI レビュー対応の報告フ�
 
 - 状態: `AGENTS.md`・`CLAUDE.md` の有無と、HQ の Skill の適用方針の記載。
 - 導入: [AGENTS.md の例](examples/project/AGENTS.md) の「大枠と作業の関係」「Skill の適用」「文書の配置」を既存の指示へ統合します。Claude Code では [CLAUDE.md の例](examples/project/CLAUDE.md) も使えます。丸ごと上書きしません。
-- 変更: 作業記録（標準 `wip/`）や Gotchas（標準 `GOTCHAS.md`）の場所を変える場合は、[保存先の設定](#作業記録と-gotchas-の保存先) を `.hq/v2/settings.json` に記録し、指示ファイルの記載も同じパスに合わせます。
+- 変更: 作業記録（標準 `wip/`）や Gotchas（標準 `GOTCHAS.md`）の場所を変える場合は、[保存先の設定](#保存先の設定) を `.hq/v2/settings.json` に記録し、指示ファイルの記載も同じパスに合わせます。
 - 取りやめ: 足した記述を示して確認し、削除します。
 
 #### 3. Git の規約と既定値
@@ -406,11 +407,11 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 新規の標準名は `docs/{PRD,FDS,ADD}.md` です。既存の同等文書はそのまま使い、二重管理しません。
 [文書の役割](skills/sdd/references/document-roles.md) に粒度と分担を定義しています。
 
-作業記録と Gotchas は、HQ がなくても読めるプロジェクトの記録として、`.hq/v2/` ではなくプロジェクトのリポジトリ内に置きます。`.hq/v2/` には HQ が解釈する規約・設定だけを置きます。標準の場所と変更方法は [作業記録と Gotchas の保存先](#作業記録と-gotchas-の保存先) にまとめています。
+作業記録と Gotchas は、HQ がなくても読めるプロジェクトの記録として、`.hq/v2/` ではなくプロジェクトのリポジトリ内に置きます。`.hq/v2/` には HQ が解釈する規約・設定だけを置きます。標準の場所と変更方法は [保存先の設定](#保存先の設定) にまとめています。
 
 新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` と `status.json` を標準とし、短い内容は `work.md` に節を分けて統合できます。要求は Goal（何を変えたい・作りたいか）・Context（影響する範囲）・Constraints（守る標準・規約）・Done When（完了とする条件と確認方法）で書きます。`tasks.md` または `work.md` の冒頭に短い概要と詳しい現在地を残します。
 
-`status.json` は状態（`active`・`paused`・`done`）・SOT への影響（`sotImpact`）・PR 番号を持ちます。SOT（docs/）の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断します。作業の規模では決めません。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/work-records.md) にまとめています。
+`status.json` は状態（`active`・`paused`・`done`）・SOT への影響（`sotImpact`）・PR 番号を持ちます。SOT（docs/）の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断します。作業の規模では決めません。PR を作る前に、記録の判断と SOT の変更を突き合わせ、SOT と実装の食い違いを確かめます。形式・状態の変更・削除の条件・PR 作成前の確認は [作業記録の形式と整理](docs/work-records.md) にまとめています。
 
 Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
@@ -437,9 +438,9 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
 
-### 作業記録と Gotchas の保存先
+### 保存先の設定
 
-標準の場所はルートの `wip/` と `GOTCHAS.md` です。別の場所にする場合は、Git 管理する共有設定 `.hq/v2/settings.json` に記録します。値はリポジトリのルートからの相対パスで、指定した項目だけが変わります。
+作業記録・Gotchas・SOT（プロジェクトの大枠の文書）の標準の場所は、ルートの `wip/`・`GOTCHAS.md`・`docs/` です。別の場所にする場合は、Git 管理する共有設定 `.hq/v2/settings.json` に記録します。値はリポジトリのルートからの相対パスで、指定した項目だけが変わります。
 
 ```json
 {
@@ -448,12 +449,16 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
   },
   "gotchas": {
     "path": "notes/gotchas.md"
+  },
+  "sdd": {
+    "path": "spec"
   }
 }
 ```
 
 - `wip.path`: 作業記録を置くディレクトリ。未指定なら `wip`。
 - `gotchas.path`: Gotchas を記録するファイル。未指定なら `GOTCHAS.md`。
+- `sdd.path`: SOT の文書を置くディレクトリ。未指定なら `docs`。sdd が大枠を記録し、wip と PR 作成前の確認が SOT として参照します。
 - チームで同じ場所を使うため、checkout 固有の `.hq/v2/.ignore/settings.json` では変更しません。
 - 値が文字列でない、空、絶対パス、`..` を含む場合、各 Skill は標準値に戻さず問題を伝えます。
 - 指定した場所が `.gitignore` などで Git 管理から外れていないか確認します。例えば、トップレベルの `work/` を無視しているリポジトリで `work` を指定すると、記録が共有されません。
@@ -575,12 +580,15 @@ skills/pr-feedback/
 hooks/hooks.json                    Claude Code 用 Hook
 hooks/codex.json                    Codex 用 Hook（中断イベントを含む）
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
+hooks/sot_check.py                  PR 作成時の SOT と実装の確認
+hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
 docs/pr-feedback.md                 オプトインと運用・検証
 hooks/git/pre-commit                Git Hook の配布用雛形
 scripts/commit_security.py           コミット対象のセキュリティチェック
 scripts/setup_security.py            Git Hook の導入・更新・状態確認
-scripts/wip.py                       作業記録の一覧と削除できる記録の判定
+scripts/wip.py                       作業記録の一覧・削除判定・PR 作成前の SOT 確認
+docs/work-records.md                 作業記録の形式・削除の条件・PR 作成前の確認
 docs/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
 ```

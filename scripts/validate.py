@@ -150,6 +150,9 @@ def main(release_ready=False):
         "skills/wip/assets/wip/status.json",
         "skills/sweep/SKILL.md",
         "scripts/wip.py",
+        "hooks/sot_check.py",
+        "hooks/pr_event.py",
+        "docs/work-records.md",
         "skills/gotchas/SKILL.md",
         "skills/git/SKILL.md",
         "skills/git/references/settings.md",
@@ -194,7 +197,7 @@ def main(release_ready=False):
         if "commitSecurity" in settings:
             section = settings["commitSecurity"]
             require(isinstance(section, dict) and isinstance(section.get("required"), bool), f"{relative}: commitSecurity.required must be a boolean")
-        for key in ("wip", "gotchas"):
+        for key in ("wip", "gotchas", "sdd"):
             if key in settings:
                 section = settings[key]
                 value = section.get("path") if isinstance(section, dict) else None

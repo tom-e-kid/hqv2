@@ -6,6 +6,10 @@
 
 ### Added
 
+- SOT と実装の乖離を防ぐ PR 作成前の確認。`scripts/wip.py check-pr` が、変更に含まれる作業記録の `sotImpact` と SOT の変更を突き合わせ、SOT への影響ありなのに実装だけが変わった変更などを指摘する。SOT が先に変わった変更は指摘しない。pr・git・wip の手順で PR 作成前に確認し、Codex・Claude Code の `PreToolUse` Hook がエージェントの PR 作成時に同じ判定を伝える。PR 作成は止めない。
+
+- SOT の文書の場所を共有設定 `.hq/v2/settings.json` の `sdd.path`（未指定は `docs`）で変更できるようにした。sdd・wip・PR 作成前の確認が同じ設定に従う。
+
 - 完了した作業記録を整理する `sweep` Skill。取り込み先に `done` の状態が入った記録だけを、知識の反映と参照の付け替えを確認して削除し、状態ファイルの欠落・不正、PR がすべて取り込まれたのに進行中の記録、Done When のない記録などを報告する。取り込み方法には依存しない。
 
 - 作業記録の状態ファイル `status.json`（状態 `active`・`paused`・`done`、SOT への影響、PR 番号）と、記録の一覧と削除できる記録を判定する `scripts/wip.py`。SOT（docs/）の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断する。作業の規模では決めない。記録の形式・状態の変更・削除の条件は `docs/work-records.md` にまとめた。

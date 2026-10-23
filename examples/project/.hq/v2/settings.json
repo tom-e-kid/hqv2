@@ -15,5 +15,8 @@
   },
   "gotchas": {
     "path": "GOTCHAS.md"
+  },
+  "sdd": {
+    "path": "docs"
   }
 }
