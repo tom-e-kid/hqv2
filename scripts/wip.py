@@ -26,13 +26,22 @@ def repository_root(cwd):
     return Path(result.stdout.strip())
 
 
-def setting_path(root, key):
+def settings_text(root, revision):
+    """Return the shared settings from the working tree, or from a commit when a revision is given."""
+    if revision is not None:
+        shown = git(root, "show", f"{revision}:.hq/v2/settings.json")
+        return None if shown.returncode else shown.stdout
+    settings = root / ".hq/v2/settings.json"
+    return settings.read_text(encoding="utf-8") if settings.is_file() else None
+
+
+def setting_path(root, key, revision=None):
     """Return <key>.path from the shared settings, relative to the repository root."""
     value = DEFAULTS[key]
-    settings = root / ".hq/v2/settings.json"
-    if settings.is_file():
+    text = settings_text(root, revision)
+    if text is not None:
         try:
-            data = json.loads(settings.read_text(encoding="utf-8"))
+            data = json.loads(text)
         except ValueError:
             raise WipError(".hq/v2/settings.json is not valid JSON") from None
         if not isinstance(data, dict):
@@ -48,12 +57,12 @@ def setting_path(root, key):
     return path
 
 
-def wip_path(root):
-    return setting_path(root, "wip")
+def wip_path(root, revision=None):
+    return setting_path(root, "wip", revision)
 
 
-def sdd_path(root):
-    return setting_path(root, "sdd")
+def sdd_path(root, revision=None):
+    return setting_path(root, "sdd", revision)
 
 
 def is_number(value):
@@ -124,13 +133,16 @@ def classify(root, base, record):
     return "deletable", "the done record is on the base revision"
 
 
-def verify_base(root, base):
-    if git(root, "rev-parse", "--verify", "--quiet", f"{base}^{{commit}}").returncode:
-        raise WipError("Base revision not found; fetch it or pass an existing revision")
+def commit(root, revision, label="Base"):
+    """Return the commit ID so later steps keep the same target even if the checkout moves."""
+    result = git(root, "rev-parse", "--verify", "--quiet", f"{revision}^{{commit}}")
+    if result.returncode:
+        raise WipError(f"{label} revision not found; fetch it or pass an existing revision")
+    return result.stdout.strip()
 
 
 def sweepable(root, base):
-    verify_base(root, base)
+    commit(root, base)
     result = []
     for record in records(root):
         state, detail = classify(root, base, record)
@@ -153,12 +165,13 @@ FINDINGS = {
 }
 
 
-def check_pr(root, base):
-    """Compare the SOT impact recorded in this change with what the change does to the SOT."""
-    verify_base(root, base)
-    records_dir, sot_dir = wip_path(root), sdd_path(root)
-    # Only committed changes form the PR; the merge base keeps unrelated base updates out.
-    diff = git(root, "diff", "--name-only", "-z", f"{base}...HEAD")
+def check_pr(root, base, head="HEAD"):
+    """Compare the SOT impact recorded in the change from base to head with what it does to the SOT."""
+    base, head = commit(root, base), commit(root, head, "Head")
+    # Settings and records come from the head commit, so uncommitted edits never mix in.
+    records_dir, sot_dir = wip_path(root, head), sdd_path(root, head)
+    # The merge base keeps unrelated base updates out, as in the pull request.
+    diff = git(root, "diff", "--name-only", "-z", f"{base}...{head}")
     if diff.returncode:
         raise WipError("Changed files could not be listed")
     paths = [path for path in diff.stdout.split("\0") if path]
@@ -170,9 +183,9 @@ def check_pr(root, base):
     for name in names:
         path = f"{records_dir.as_posix()}/{name}"
         # Like records(), hidden entries and anything but a directory are not records.
-        if name.startswith(".") or git(root, "cat-file", "-t", f"HEAD:{path}").stdout.strip() != "tree":
+        if name.startswith(".") or git(root, "cat-file", "-t", f"{head}:{path}").stdout.strip() != "tree":
             continue  # Includes a record removed by this change, for example when sweeping finished records.
-        shown = git(root, "show", f"HEAD:{path}/status.json")
+        shown = git(root, "show", f"{head}:{path}/status.json")
         if shown.returncode:
             status, problem = None, "status.json is missing"
         else:
@@ -187,7 +200,7 @@ def check_pr(root, base):
             findings.append({"code": "impact-mismatch", "record": name, "detail": FINDINGS["impact-mismatch"]})
     if sot_changed and not records:
         findings.append({"code": "sot-without-record", "record": None, "detail": FINDINGS["sot-without-record"]})
-    return {"base": base, "sotPath": sot_dir.as_posix(), "sotChanged": sot_changed,
+    return {"base": base, "head": head, "sotPath": sot_dir.as_posix(), "sotChanged": sot_changed,
             "implementationChanged": implementation, "records": records, "findings": findings}
 
 
@@ -203,6 +216,7 @@ def main():
     parser.add_argument("action", choices=("list", "sweepable", "check-pr"))
     parser.add_argument("--repo", default=".")
     parser.add_argument("--base", help="base revision for sweepable and check-pr, for example origin/develop")
+    parser.add_argument("--head", default="HEAD", help="head revision for check-pr (default: HEAD)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
     try:
@@ -214,7 +228,7 @@ def main():
         elif args.action == "sweepable":
             rows = sweepable(root, args.base)
         else:
-            rows = check_pr(root, args.base)
+            rows = check_pr(root, args.base, args.head)
     except WipError as error:
         # Messages are static; raw Git output may contain local paths.
         print(f"wip: {error}", file=sys.stderr)

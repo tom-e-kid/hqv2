@@ -122,7 +122,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | 実行するもの | Codex・Claude Code | Git |
 | 対象 | そのセッションでのエージェントの操作 | 人・IDE・エージェントを問わない、そのリポジトリの Git 操作 |
 | 有効になる条件 | Plugin の読み込み。Codex は Hook 定義の信頼も必要 | clone ごとの導入 |
-| HQ での用途 | 状態の通知、PR 作成時の SOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
+| HQ での用途 | 状態の通知、作成した PR の SOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
 
 開発の流れの中で HQ の Hook が動く箇所です。
 
@@ -132,7 +132,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git | 同上 | 項目 7 の導入 |
-| PR 作成時 | `PreToolUse` | Plugin | 変更に含まれる作業記録の SOT への影響と SOT の変更を突き合わせ、乖離のおそれがあればモデルへ伝える。PR 作成は止めず、注意は実行結果とともに届く | 作業記録を使うリポジトリ |
+| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットについて、作業記録の SOT への影響と SOT の変更を突き合わせる。乖離のおそれ、または確認できなかったことをモデルへ伝える | 作業記録を使うリポジトリ。`gh` で PR を参照できること |
 | PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
 | 中断 | `Interrupt` | Plugin（Codex のみ） | 監視の中断を記録 | 監視の登録 |
@@ -580,7 +580,7 @@ skills/pr-feedback/
 hooks/hooks.json                    Claude Code 用 Hook
 hooks/codex.json                    Codex 用 Hook（中断イベントを含む）
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
-hooks/sot_check.py                  PR 作成時の SOT と実装の確認
+hooks/sot_check.py                  作成した PR の SOT と実装の確認
 hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
 docs/pr-feedback.md                 オプトインと運用・検証

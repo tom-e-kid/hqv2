@@ -186,6 +186,24 @@ class WipTests(unittest.TestCase):
         self.commit("broken record")
         self.assertIn(("invalid-status", "20261002-broken"), self.codes())
 
+    def test_check_pr_checks_the_given_head_commit(self):
+        self.git("switch", "-qc", "feat")
+        self.record("20261001-impact", sot=True)
+        self.write("src/app.py", "change = 1\n")
+        self.commit("implementation only")
+        head, base = self.git("rev-parse", "HEAD").strip(), self.git("rev-parse", "develop").strip()
+        # The checkout no longer matters once the head is given; both ends are reported as commit IDs.
+        self.git("switch", "-q", "develop")
+        result = self.run_script("check-pr", "--base", "develop", "--head", "feat")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = json.loads(result.stdout)
+        self.assertEqual((result["base"], result["head"]), (base, head))
+        self.assertEqual([item["code"] for item in result["findings"]], ["sot-not-updated"])
+        self.assertEqual(self.check()["findings"], [])
+        result = self.run_script("check-pr", "--base", "develop", "--head", "missing")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Head revision", result.stderr)
+
     def test_check_pr_reports_a_record_without_its_status_file(self):
         self.git("switch", "-qc", "feat")
         self.write("wip/20261001-partial/work.md", "# partial\n")
@@ -220,8 +238,12 @@ class WipTests(unittest.TestCase):
         self.write("src/uncommitted.py", "pending = 1\n")
         self.assertEqual(self.check()["records"], [])
         self.assertEqual(self.codes(), [])
+        # Settings come from the checked commit: an uncommitted change does not count, a committed one does.
+        self.write(".hq/v2/settings.json", {"sdd": {"path": "../x"}})
+        self.assertEqual(self.codes(), [])
         for value in ("../x", "/abs"):
             self.write(".hq/v2/settings.json", {"sdd": {"path": value}})
+            self.commit(f"setting {value}")
             result = self.run_script("check-pr", "--base", "develop")
             self.assertEqual(result.returncode, 2)
             self.assertIn("sdd.path", result.stderr)

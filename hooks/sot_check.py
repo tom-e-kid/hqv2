@@ -1,202 +1,120 @@
 #!/usr/bin/env python3
-"""Advise at pull request creation when a change may let the implementation diverge from the SOT."""
+"""After an agent creates a pull request, advise when it may let the implementation diverge from the SOT."""
 
 import json
-import os
 from pathlib import Path
-import shlex
+import re
+import subprocess
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 import wip
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from pr_event import creation_candidate, tool_arguments, tool_command
+from pr_event import creation_candidate
 
-OPERATORS = set("();<>|&")
-
-
-class Unresolved(Exception):
-    """The checkout, branch or base that the PR is created from could not be determined."""
-
-
-def shell_words(command):
-    lexer = shlex.shlex(command, posix=True, punctuation_chars=True)
-    lexer.whitespace_split = True
-    return list(lexer)
+GH_TIMEOUT = 20
+PR_URL = re.compile(r"https://([\w.-]+)/([\w.-]+)/([\w.-]+)/pull/(\d+)(?!\d)")
+REMOTE_URL = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?[^/:\s]+(?::\d+)?[:/](.+?)(?:\.git)?/*$", re.I)
+OBJECT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 
-def option(arguments, long, short):
-    """Return the value of an option such as --base/-B, or None when it is absent."""
-    for index, word in enumerate(arguments):
-        if word in (long, short):
-            return arguments[index + 1] if index + 1 < len(arguments) else ""
-        if word.startswith(long + "="):
-            return word.split("=", 1)[1]
-    return None
+class Unchecked(Exception):
+    """The created pull request could not be tied to commits in this repository."""
 
 
-def change_directory(directory, arguments):
-    """Follow a literal `cd <dir>`; anything the shell must evaluate is not resolved."""
-    target = arguments[0] if arguments else "~"
-    if len(arguments) > 1 or target == "-" or "$" in target or "`" in target:
-        raise Unresolved("the directory the command runs in could not be determined")
-    return directory / os.path.expanduser(target)
+def created_pull_request(event):
+    """Return (owner/repo, URL) of the single pull request named in the tool result."""
+    output = json.dumps(event.get("tool_response", ""), ensure_ascii=False)
+    found = {(f"{match[2]}/{match[3]}".lower(), f"https://{match[1].lower()}/{match[2]}/{match[3]}/pull/{match[4]}".lower())
+             for match in PR_URL.finditer(output)}
+    if len(found) != 1:
+        raise Unchecked("the tool result does not name exactly one pull request")
+    return found.pop()
 
 
-def shell_call(command, directory):
-    """Return (directory, head, base) of the first `gh pr create`, or None when the command does not run it."""
+def remote_repositories(root):
+    """Return owner/repo of every remote; the same commits may exist in another repository."""
+    found = set()
+    for line in wip.git(root, "remote", "-v").stdout.splitlines():
+        parts = line.split()
+        match = REMOTE_URL.match(parts[1]) if len(parts) > 1 else None
+        if match:
+            found.add(match[1].lower())
+    return found
+
+
+def pull_request_commits(root, url):
+    """Return the (head, base) commit IDs that GitHub reports for the pull request."""
     try:
-        words = shell_words(command)
-    except ValueError:
-        raise Unresolved("the command could not be parsed") from None
-    starts = [index for index in range(len(words) - 2)
-              if os.path.basename(words[index]) == "gh" and words[index + 1:index + 3] == ["pr", "create"]]
-    if not starts:
+        result = subprocess.run(["gh", "pr", "view", url, "--json", "headRefOid,baseRefOid"], cwd=root,
+                                capture_output=True, text=True, timeout=GH_TIMEOUT)
+        data = json.loads(result.stdout) if not result.returncode else {}
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        data = {}
+    commits = (data.get("headRefOid"), data.get("baseRefOid")) if isinstance(data, dict) else (None, None)
+    if not all(isinstance(value, str) and OBJECT_ID.fullmatch(value) for value in commits):
+        raise Unchecked("the pull request's head and base commits could not be retrieved with gh")
+    return commits
+
+
+def uses_records(root, *revisions):
+    """Whether any of the commits keeps work records; an invalid wip.path counts so it is not hidden."""
+    for revision in revisions:
+        try:
+            path = wip.wip_path(root, revision).as_posix()
+        except wip.WipError:
+            return True
+        if wip.git(root, "cat-file", "-t", f"{revision}:{path}").stdout.strip() == "tree":
+            return True
+    return False
+
+
+def check(root, event):
+    """Return (URL, result) for the created pull request, None when it keeps no records, or raise Unchecked."""
+    repository, url = created_pull_request(event)
+    if repository not in remote_repositories(root):
+        raise Unchecked("this repository has no remote for the pull request's repository")
+    head, base = pull_request_commits(root, url)
+    for revision in (head, base):
+        if wip.git(root, "cat-file", "-e", f"{revision}^{{commit}}").returncode:
+            raise Unchecked("the pull request's head or base commit is not in this repository; fetch it")
+    # Stay quiet in repositories that do not keep work records.
+    if not uses_records(root, base, head):
         return None
-    # Commands before the PR creation may move to another checkout, such as a work tree.
-    segments, current, separators = [], [], set()
-    for word in words[:starts[0]]:
-        if set(word) <= OPERATORS:
-            separators.add(word)
-            segments.append(current)
-            current = []
-        else:
-            current.append(word)
-    moves = [segment for segment in segments if segment and segment[0] in ("cd", "pushd", "popd")]
-    if moves and not separators <= {"&&", ";"}:
-        raise Unresolved("the directory the command runs in could not be determined")
-    for segment in moves:
-        if segment[0] == "popd":
-            raise Unresolved("the directory the command runs in could not be determined")
-        directory = change_directory(directory, segment[1:])
-    arguments = []
-    for word in words[starts[0] + 3:]:
-        if set(word) <= OPERATORS:
-            break
-        arguments.append(word)
-    if "GH_REPO" in command or option(arguments, "--repo", "-R") is not None:
-        raise Unresolved("the PR targets a repository named by --repo or GH_REPO")
-    return directory, option(arguments, "--head", "-H"), option(arguments, "--base", "-B")
-
-
-def creation_call(event, directory):
-    """Return (directory, head, base) that the PR is created from, or None when no PR is created."""
-    if tool_command(event):
-        return shell_call(tool_command(event), directory)
-    # MCP tools run outside the shell; their arguments name the branches.
-    arguments = tool_arguments(event)
-
-    def pick(*keys):
-        return next((arguments[key] for key in keys if isinstance(arguments.get(key), str) and arguments[key]), None)
-    return directory, pick("head", "head_branch", "headBranch"), pick("base", "base_branch", "baseBranch")
-
-
-def git_settings(path):
-    try:
-        data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
-    except (OSError, ValueError):
-        return {}
-    section = data.get("git") if isinstance(data, dict) else None
-    return section if isinstance(section, dict) else {}
-
-
-def configured_target(root, branch):
-    """Return (remote, base) for the branch; checkout-local settings override shared ones."""
-    sources = (git_settings(root / ".hq/v2/.ignore/settings.json"), git_settings(root / ".hq/v2/settings.json"))
-    for source in sources:
-        branches = source.get("branches")
-        target = branches.get(branch) if isinstance(branches, dict) else None
-        if isinstance(target, dict):
-            return target.get("remote"), target.get("baseBranch")
-
-    def pick(key):
-        for source in sources:
-            if isinstance(source.get(key), str) and source[key]:
-                return source[key]
-        return None
-    return pick("remote"), pick("baseBranch")
-
-
-def base_revision(root, branch, requested):
-    remote, configured = configured_target(root, branch)
-    base = requested or configured
-    if not isinstance(base, str) or not base:
-        return None
-    candidates = [f"{remote}/{base}"] if isinstance(remote, str) and remote else []
-    for candidate in candidates + [base]:
-        if not wip.git(root, "rev-parse", "--verify", "--quiet", f"{candidate}^{{commit}}").returncode:
-            return candidate
-    return None
+    return url, wip.check_pr(root, base, head)
 
 
 def context(message):
-    return {"hookSpecificOutput": {"hookEventName": "PreToolUse", "additionalContext": message}}
-
-
-def keeps_records(directory):
-    """Whether the repository keeps work records; an invalid wip.path counts so the skip is not hidden."""
-    try:
-        root = wip.repository_root(directory)
-    except (wip.WipError, OSError):
-        return False
-    try:
-        return (root / wip.wip_path(root)).is_dir()
-    except wip.WipError:
-        return True
-
-
-def check(event, cwd):
-    """Return the check result, None when there is nothing to check, or raise Unresolved."""
-    call = creation_call(event, Path(cwd))
-    if call is None:
-        return None
-    directory, head, requested = call
-    if not directory.is_dir():
-        raise Unresolved("the directory the command runs in could not be determined")
-    try:
-        root = wip.repository_root(directory)
-    except wip.WipError:
-        return None
-    branch = wip.git(root, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
-    if head and head.split(":")[-1] != branch:
-        raise Unresolved("the PR head is not the branch checked out where the command runs", root)
-    base = base_revision(root, branch, requested)
-    if base is None:
-        raise Unresolved("the PR base branch could not be determined", root)
-    # gh creates a PR only from commits ahead of the base; without any, another checkout is the source.
-    if not wip.git(root, "merge-base", "--is-ancestor", "HEAD", base).returncode:
-        raise Unresolved("the checked-out branch has no commits ahead of the base, so the PR is likely "
-                         "created from another checkout", root)
-    return base, wip.check_pr(root, base)
+    return {"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": message}}
 
 
 def handle(event):
-    if event.get("hook_event_name") != "PreToolUse" or not creation_candidate(event):
+    if event.get("hook_event_name") != "PostToolUse" or not creation_candidate(event):
         return None
     cwd = event.get("cwd")
     if not isinstance(cwd, str) or not cwd or not Path(cwd).is_dir():
         return None
     try:
-        checked = check(event, cwd)
-    except Unresolved as error:
-        reason, *where = error.args
-        # Stay quiet in repositories that do not keep work records.
-        if not keeps_records(where[0] if where else cwd):
+        root = wip.repository_root(cwd)
+    except wip.WipError:
+        return None  # Without a repository there are no commits to check.
+    try:
+        checked = check(root, event)
+    except Unchecked as error:
+        if not uses_records(root, "HEAD"):
             return None
-        return context(f"HQ SOT check not run: {reason}. Run scripts/wip.py check-pr with --repo and --base "
-                       "in the checkout the PR is created from to check SOT alignment.")
+        return context(f"HQ SOT check not run: {error}. Run scripts/wip.py check-pr with --base and --head "
+                       "set to the pull request's commits to check SOT alignment.")
     except wip.WipError as error:
         return context(f"HQ SOT check could not run: {error}.")
-    if checked is None:
+    if checked is None or not checked[1]["findings"]:
         return None
-    base, result = checked
-    if not result["findings"]:
-        return None
+    url, result = checked
     lines = [f"- {item['code']} ({item['record'] or 'no record'}): {item['detail']}" for item in result["findings"]]
-    return context(f"HQ SOT check against {base}: the SOT ({result['sotPath']}) and the implementation may diverge. "
-                   "This does not block the PR. Tell the user, and resolve it in this PR or by agreement.\n"
-                   + "\n".join(lines))
+    return context(f"HQ SOT check of {url} (base {result['base'][:12]}, head {result['head'][:12]}): the SOT "
+                   f"({result['sotPath']}) and the implementation may diverge. Tell the user, and resolve it "
+                   "in this PR or by agreement.\n" + "\n".join(lines))
 
 
 def main():
@@ -205,7 +123,7 @@ def main():
         if result:
             print(json.dumps(result, ensure_ascii=False))
     except Exception:
-        # Advisory only: never block PR creation or print raw hook input.
+        # Advisory only: never fail the tool call or print raw hook input.
         print("HQ SOT check: hook failed; SOT alignment was not checked", file=sys.stderr)
     return 0
 

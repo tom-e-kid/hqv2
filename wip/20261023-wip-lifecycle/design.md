@@ -64,14 +64,14 @@ Python 標準ライブラリだけで動く。保存先は `.hq/v2/settings.json
 注意の文面は「SOT が変更されていない」だけでなく、関係する SOT の箇所と実装の差を確かめるよう促す。
 
 - pr Skill: PR 作成前に `scripts/wip.py check-pr` を実行し、注意があれば本文や利用者への報告で扱う。実行できなければ記録を読んで同じ観点で確認する。
-- Plugin Hook: `PreToolUse` で `gh pr create` と PR 作成用 MCP ツールを検出し、同じ判定の結果を `additionalContext` でモデルに渡す。拒否はしない。Claude Code は `hooks/hooks.json`、Codex は `hooks/codex.json` に追加する。Codex は公式文書で `PreToolUse` による Bash・MCP ツールの検出と `additionalContext` を確認済み。`ask` は Codex で未対応のため使わない。
-- 取り込み先は、`gh pr create --base` の指定、作業ブランチの記録、`git.baseBranch` の順で決める。決まらなければ判定しなかったことを伝える。
+- Plugin Hook: `PostToolUse` で `gh pr create` と PR 作成用 MCP ツールを検出し、作成された PR へ同じ判定を行って、結果を `additionalContext` でモデルに渡す。Claude Code は `hooks/hooks.json`、Codex は `hooks/codex.json` に追加する。当初は `PreToolUse` でコマンドを解析して PR を作る checkout を推定したが、改行区切りの `cd` などを見落とし、シェルの書き方を網羅できないため改めた（2026-10-24）。`PreToolUse` の注意も実行結果とともに届くため、時点の違いはない。
+- 判定の根拠は作成された PR にする。実行結果から PR の URL を一つ特定し、`gh pr view` で head・base のコミット ID を取得して、そのコミットで判定する。設定と状態ファイルも head のコミットから読む。作業中のリポジトリは Git オブジェクトへのアクセス手段として使い、PR のリポジトリを指すリモートがあることと、両コミットが手元にあることを確かめる。PR の特定・リポジトリの対応・`gh` の取得（失敗・タイムアウト）・コミットのいずれかが欠ければ、判定せずに未確認と伝える。
 
 Git には PR 作成のイベントがないため Git Hook は使わない。ブラウザ等で作成する PR は対象外とする。
 
 ### G. 文書と配布
 
-- README: Skill 一覧と呼び出し例に `sweep`、作業記録の節に状態・SOT への影響・要求の書式、利用先のセットアップに `sweep` の定期実行の項目、Hook の全体像に `PreToolUse` を追加する。
+- README: Skill 一覧と呼び出し例に `sweep`、作業記録の節に状態・SOT への影響・要求の書式、利用先のセットアップに `sweep` の定期実行の項目、Hook の全体像に SOT 確認の Hook を追加する。
 - AGENTS.md の構成と責務、Codex マニフェストの説明、利用先の AGENTS.md の例、検証手順、CHANGELOG を更新する。
 - `scripts/validate.py` の必須資源に `skills/sweep/SKILL.md` を加える。
 
@@ -82,9 +82,9 @@ Git には PR 作成のイベントがないため Git Hook は使わない。�
 ## 検証方針
 
 - `scripts/wip.py` の自動テスト: 一時リポジトリで状態ファイルの読み取り・欠落・不正、`sweepable` の取り込み先判定、`check-pr` の `sotImpact` と SOT の変更の突き合わせ、`wip.path` の設定。
-- Hook の入出力テスト: PR 作成コマンドの検出、注意の出力、取り込み先不明時の扱い、PR 作成以外の無出力。
+- Hook の入出力テスト: 偽の `gh` を使い、入力の種類ごとに確認する。PR の URL の有無・複数、リポジトリの不一致（同じコミットを持つ別リポジトリを含む）、`gh` の失敗・不正な出力・タイムアウト、head・base のコミットの欠落、checkout の切り替えと未コミットの設定変更が判定に混ざらないこと、別の worktree から作った PR、記録のないリポジトリの無出力。実装を意図的に壊してテストが失敗することも確かめる。
 - 既存の検証: `scripts/validate.py`、`quick_validate.py`、`python3 -m unittest discover -s tests`、`claude plugin validate .`、Codex のカタログ確認。
-- 製品での確認: 両製品の新しいセッションで `PreToolUse` の注意が届くこと。未実施なら PR に明記する。
+- 製品での確認: 両製品の新しいセッションで、PR 作成後の `PostToolUse` の注意が届くこと。実行結果（`tool_response`）の形は単体テストとは別の未検証項目として扱う。未実施なら PR に明記する。
 
 ## 合意した判断（2026-10-23）
 

@@ -39,8 +39,8 @@
 | SOT に影響する作業は必ず記録を作り、影響しない作業はモデルが判断する | wip の記述と検証ケース |
 | `done` の記録が取り込み先に入った後に、`sweep` が削除を判断・実施する。状態ファイルがない・不正な記録は削除しない | 一時リポジトリでのスクリプトの自動テスト |
 | work-maintenance が `sweep` を読み、HQ 固有の処理だけを持つ | Skill の記述と週次タスクの指示文が変更不要であること |
-| PR 作成前に `sotImpact` と SOT の変更を突き合わせ、食い違いを止めずに伝える。pr Skill と PreToolUse Hook の両方から同じ判定を使う | スクリプトと Hook 入出力の自動テスト、両製品での実機確認 |
-| README に `sweep` の定期実行の設定手順、PreToolUse を含む Hook の全体像、状態・SOT への影響の説明がある | README の確認とアンカー照合 |
+| PR 作成前に `sotImpact` と SOT の変更を突き合わせ、食い違いを止めずに伝える。pr Skill と、作成した PR を確認する PostToolUse Hook の両方から同じ判定を使う | スクリプトと Hook 入出力の自動テスト、両製品での実機確認 |
+| README に `sweep` の定期実行の設定手順、SOT 確認の Hook を含む Hook の全体像、状態・SOT への影響の説明がある | README の確認とアンカー照合 |
 | 要求の書式の扱いが決まり、雛形・Skill・検証ケースに反映されている | 雛形と Skill の記述 |
 | 構造・参照・配布設定の検証、Skill の専用検証、自動テストが通る | `scripts/validate.py`、`quick_validate.py`、`python3 -m unittest discover -s tests`、`claude plugin validate .` |
 

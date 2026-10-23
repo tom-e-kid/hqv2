@@ -11,21 +11,14 @@
         ]
       }
     ],
-    "PreToolUse": [
+    "PostToolUse": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/sot_check.py\"",
             "timeout": 30
-          }
-        ],
-        "matcher": "Bash|.*create_pull_request|.*pull_request_create"
-      }
-    ],
-    "PostToolUse": [
-      {
-        "hooks": [
+          },
           {
             "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_feedback.py\"",
