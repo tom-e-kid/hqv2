@@ -186,6 +186,9 @@ def main(release_ready=False):
             for field in ("remote", "baseBranch"):
                 value = target.get(field)
                 require(isinstance(value, str) and value.strip(), f"{relative}: missing {field} for {branch}")
+        if "commitSecurity" in settings:
+            section = settings["commitSecurity"]
+            require(isinstance(section, dict) and isinstance(section.get("required"), bool), f"{relative}: commitSecurity.required must be a boolean")
 
     settings = read_json(".hq/v2/settings.json")
     release = validate_release_settings(settings, ".hq/v2/settings.json", check_files=True)

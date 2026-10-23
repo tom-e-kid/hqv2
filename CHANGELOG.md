@@ -6,6 +6,10 @@
 
 ### Added
 
+- README に利用先のセットアップ手順と、利用先のセッションに貼り付ける導入プロンプトを追加。利用先で必要な設定を項目ごとに状態確認・選択・再確認しながら導入・変更・取りやめでき、Plugin Hook と Git Hook の役割・動作箇所・対象外の操作を一覧にした。
+
+- コミット前チェックの採用を共有設定の `commitSecurity.required` で宣言する設定。
+
 - 利用先ごとのオプトインで AI Reviewer の指摘を待機・分類・修正・返信・Resolve・再確認する `pr-feedback` Skill、最大3回のバッチ管理と Codex・Claude Code 向け Hook。
 
 - ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認、チェックの前に利用先の処理（整形など）を走らせる `<Hook 名>.d/` と、Codex・Claude Code 向けの SessionStart Hook。
@@ -19,6 +23,10 @@
 - Codex・Claude Code 向けの共通 Plugin 構成と、利用先向けの規約・設定例。
 
 ### Changed
+
+- コミット前チェックの `SessionStart` 通知で、未導入は採用を宣言したリポジトリでだけ通知するように変更。導入後の欠損・変更・外部管理経路の未確認・更新候補は従来どおり通知する。
+
+- `setup_security.py` の `install`・`uninstall` を繰り返し実行できるように変更。導入済みでの `install` は成功し、HQ の以前の版の Hook、実行権限を失った HQ の Hook、欠けたコピーを現在の版に揃える。未導入での `uninstall` は変更せず成功する。HQ 以外の Hook や手編集した Hook があれば、従来どおり変更せず停止する。
 
 - `gotchas` に対象領域・操作・症状から探せる分類・検索語・状態の整理と、手動・定期タスク共通の見直し手順・依頼例を追加。
 

@@ -31,7 +31,7 @@ CWD から `git rev-parse --show-toplevel` でルートを取得する。worktre
 
 ## コミット前チェックを導入する
 
-HQ のコミット前セキュリティチェックの有効化を依頼された場合は、[導入手順](../../docs/commit-security.md) に従う。Plugin ルートの `scripts/setup_security.py install --repo <利用先>` で検証スクリプトを利用先の Git 管理領域へコピーし、Git の pre-commit Hook を導入する。実際のコマンドではスクリプトの配置と対象リポジトリを確認し、パスを適切に引用する。単に Plugin を読み込んだだけでは Git 設定を変更しない。
+HQ のコミット前セキュリティチェックの有効化を依頼された場合は、[導入手順](../../docs/commit-security.md) に従う。Plugin ルートの `scripts/setup_security.py install --repo <利用先>` で検証スクリプトを利用先の Git 管理領域へコピーし、Git の pre-commit Hook を導入する。実際のコマンドではスクリプトの配置と対象リポジトリを確認し、パスを適切に引用する。単に Plugin を読み込んだだけでは Git 設定を変更しない。先に `status` で現在の状態を確認して報告する。`install`・`uninstall` は繰り返し実行できるが、導入済みや未導入を変更の成功と取り違えない。リポジトリとして採用する場合は、共有設定の `commitSecurity.required` に採用を記録する案を示す。共有設定の変更は、ローカルの導入とは別に確認する。採用をやめる場合は宣言の削除または `false` も確認する。
 
 既存 Hook や `core.hooksPath` があれば上書きしない。既存 Hook を併用するなら `<Hook 名>.d/` へ移してから `install` する案を、Hook 管理ツールなら `prepare` でコードをコピーして既存管理方法へ組み込む案を示す。整形などの処理をチェックの前に足す依頼では、HQ の Hook を書き換えたり `core.hooksPath` を設定したりせず、`<Hook 名>.d/` に実行ファイルとして置く。`status` は外部管理方法の実行経路を保証しないため、検証不能を有効化済みと扱わない。更新は依頼された範囲で `update` を使い、Plugin 更新だけでコピーを自動更新しない。解除は `uninstall` を使う。
 
