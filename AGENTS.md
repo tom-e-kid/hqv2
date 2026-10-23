@@ -58,7 +58,7 @@ codex plugin list --marketplace hq-marketplace --json
 HQ の checkout のルートをローカル Marketplace として登録し、user scope にインストールする。他のリポジトリからも同じ登録を利用できる。既存の登録元・scope・有効状態を先に確認し、同名 Marketplace が別のソースを指す場合や、既存の project・local・managed scope の管理・無効設定に干渉する場合は、そのまま変更しない。
 
 ```bash
-claude plugin marketplace add .
+claude plugin marketplace add ./
 claude plugin marketplace update hq-marketplace
 claude plugin install hq@hq-marketplace --scope user
 claude plugin marketplace list --json

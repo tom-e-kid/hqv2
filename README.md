@@ -59,7 +59,7 @@ claude --plugin-dir .
 永続的に登録する場合は、このリポジトリのルートで実行します。
 
 ```bash
-claude plugin marketplace add .
+claude plugin marketplace add ./
 claude plugin install hq@hq-marketplace
 ```
 
@@ -281,7 +281,7 @@ claude --plugin-dir "<HQ_ROOT>"
 
 ```bash
 cd "<HQ_ROOT>"
-claude plugin marketplace add .
+claude plugin marketplace add ./
 claude plugin install hq@hq-marketplace
 cd "<TARGET_REPO>"
 claude
