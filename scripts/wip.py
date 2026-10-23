@@ -105,9 +105,14 @@ def classify(root, base, record):
     # Any later edit, staged or not, means the final record is not what the base holds.
     if git(root, "diff", "--quiet", base, "--", record["path"]).returncode:
         return "changed", "the record differs from the base revision"
-    untracked = git(root, "status", "--porcelain", "--untracked-files=all", "--", record["path"])
-    if untracked.returncode or untracked.stdout.strip():
-        return "changed", "the record has files the base revision does not have"
+    # Compare the disk with tracked files: Git status hides ignored files such as local evidence.
+    tracked = git(root, "ls-files", "-z", "--", record["path"])
+    if tracked.returncode:
+        return "changed", "tracked files could not be listed"
+    known = set(filter(None, tracked.stdout.split("\0")))
+    for item in sorted((root / record["path"]).rglob("*")):
+        if (item.is_file() or item.is_symlink()) and item.relative_to(root).as_posix() not in known:
+            return "changed", "the record has files that are not in Git"
     return "deletable", "the done record is on the base revision"
 
 

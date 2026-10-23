@@ -117,9 +117,14 @@ class WipTests(unittest.TestCase):
         self.assertEqual(rows["20261003-active"]["result"], "not-done")
         self.assertEqual(rows["20261004-missing"]["result"], "invalid")
         self.git("checkout", "--", "wip/20261001-edited/work.md")
-        self.write("wip/20261001-edited/extra.md", "untracked\n")
-        self.assertEqual(self.results("sweepable", "--base", "develop")["20261001-edited"]["result"], "changed")
-        (self.repo / "wip/20261001-edited/extra.md").unlink()
+        # Untracked, ignored and hidden files would be lost by deleting the directory.
+        self.write(".gitignore", "*.local\n")
+        self.commit("ignore local files")
+        for extra in ("extra.md", "evidence.local", "notes/.hidden"):
+            path = self.repo / "wip/20261001-edited" / extra
+            self.write(path.relative_to(self.repo).as_posix(), "unsaved\n")
+            self.assertEqual(self.results("sweepable", "--base", "develop")["20261001-edited"]["result"], "changed", extra)
+            path.unlink()
         self.assertEqual(self.results("sweepable", "--base", "develop")["20261001-edited"]["result"], "deletable")
 
     def test_base_revision_and_repository_are_required(self):

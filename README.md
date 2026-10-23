@@ -410,7 +410,7 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` と `status.json` を標準とし、短い内容は `work.md` に節を分けて統合できます。要求は Goal（何を変えたい・作りたいか）・Context（影響する範囲）・Constraints（守る標準・規約）・Done When（完了とする条件と確認方法）で書きます。`tasks.md` または `work.md` の冒頭に短い概要と詳しい現在地を残します。
 
-`status.json` は状態（`active`・`paused`・`done`）・重み・PR 番号を持ちます。重みは docs/ への影響を主に見積もり、1（docs/ を変更しない小さな修正）は記録を作らず、2 は必要に応じて作り、3（docs/ を変更する機能追加・仕様変更）は必ず作ります。工数の目安は 1 が1日まで、2 が3日まで、3 が5日以上です。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
+`status.json` は状態（`active`・`paused`・`done`）・重み・PR 番号を持ちます。重みは、SOT（docs/）の範囲を変える作業なら規模にかかわらず 3（記録を作る）、SOT を変えない明確な小さな作業なら 1（記録を作らない）、それ以外は 2（必要に応じて作る）です。工数は目安にとどめます。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/work-records.md) にまとめています。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
 
 Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 

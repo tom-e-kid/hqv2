@@ -30,6 +30,7 @@ PR (1): 状態・重み・書式・スクリプト・`sweep`・work-maintenance
 - [x] `sweep` Skill を追加し、work-maintenance を `sweep` を参照する入口に作り直す。判断の観点は `sweep` に移した。
 - [x] README・AGENTS.md・利用先の例・検証手順・CHANGELOG・Codex マニフェスト・`scripts/validate.py` を更新する。
 - [x] 検証して PR (1) を作成する（[PR #21](https://github.com/tom-e-kid/hqv2/pull/21)）。
+- [x] PR #21 のレビュー指摘5件に対応する（2026-10-23）。無視対象を含む管理外のファイルがある記録を削除不可にした。既存記録3件に Done When を追加した。取りやめと判断できない状態の扱いを揃えた。pr・git に既存記録への PR 番号の追記を加えた。重みを SOT への影響の優先順位で決める形にした。あわせて、記録の規則を `docs/work-records.md` に一本化し、wip・sweep は参照する形にした。
 
 PR (2): `sdd.path` と PR 作成前チェック
 
@@ -46,6 +47,7 @@ PR (2): `sdd.path` と PR 作成前チェック
 | `scripts/wip.py` の一覧と削除判定 | `tests/test_wip.py`（6件、一時リポジトリ） | 成功。squash で取り込んだ `done` の記録も `deletable`、取り込み後の編集・未追跡ファイル・再開・状態ファイルの欠落は削除不可 |
 | このリポジトリの記録の状態ファイル | `scripts/validate.py` | 成功。不正・欠落を検出することも確認 |
 | 構造・参照・Skill・配布設定 | `scripts/validate.py`、アンカー照合、`quick_validate.py`（Skill 10件）、`python3 -m unittest discover -s tests`（113件）、`claude plugin validate .`、Codex のカタログ確認 | 成功。`claude plugin validate` の警告は develop と同じ既知のもののみ |
+| 管理外のファイルを含む記録 | 一時リポジトリで無視対象 `evidence.local` を置いて再現し、修正後にテストで確認 | 修正前は `deletable`、修正後は未追跡・無視対象・隠しファイルのいずれも `changed` |
 | 製品内での `sweep` の実行 | 新しいセッションでの依頼 | 未実施 |
 
 ## 中断・再開と完了
