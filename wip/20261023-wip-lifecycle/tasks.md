@@ -1,6 +1,6 @@
 # 作業と現在地
 
-状態: 実装中（PR (1)）
+状態: PR (1) のレビュー待ち。PR (2) は未着手
 
 概要: 作業記録に状態ファイルと重みを導入し、完了記録の削除を共通 Skill `sweep` に任せ、PR 作成前に重みと docs/ の変更を突き合わせる。要求の書式も見直す。
 
@@ -29,7 +29,7 @@ PR (1): 状態・重み・書式・スクリプト・`sweep`・work-maintenance
 - [x] `scripts/wip.py`（`list`・`sweepable`）とテストを追加する。
 - [x] `sweep` Skill を追加し、work-maintenance を `sweep` を参照する入口に作り直す。判断の観点は `sweep` に移した。
 - [x] README・AGENTS.md・利用先の例・検証手順・CHANGELOG・Codex マニフェスト・`scripts/validate.py` を更新する。
-- [ ] 検証して PR (1) を作成する。
+- [x] 検証して PR (1) を作成する（[PR #21](https://github.com/tom-e-kid/hqv2/pull/21)）。
 
 PR (2): `sdd.path` と PR 作成前チェック
 
@@ -50,4 +50,4 @@ PR (2): `sdd.path` と PR 作成前チェック
 
 ## 中断・再開と完了
 
-現在地: PR (1) の実装まで。次は PR (1) の検証と作成。
+現在地: PR (1) を #21 として提出し、レビュー・取り込み待ち。取り込み後に PR (2) へ進む。
