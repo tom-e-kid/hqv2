@@ -174,7 +174,7 @@ class SotCheckHookTests(unittest.TestCase):
         self.assertTrue(message.startswith("HQ SOT check not run:"), message)
         self.assertIn("could not be retrieved", message)
 
-    def test_repositories_without_records_stay_quiet(self):
+    def test_only_pr_commits_without_records_stay_quiet(self):
         self.git("rm", "-rq", "wip")
         self.commit("no records")
         self.base = self.rev("develop")
@@ -182,10 +182,23 @@ class SotCheckHookTests(unittest.TestCase):
         self.write("docs/PRD.md", "# PRD\nchanged\n")
         self.commit("docs only")
         self.assertIsNone(self.run_hook(self.created()))
-        self.assertIsNone(self.run_hook(self.created("no URL\n")))
+        # The PR adds the first record while the checkout has none: the checkout is no evidence either way.
+        self.git("switch", "-qc", "first", "develop")
+        self.write("wip/20261001-first/status.json", {"status": "active", "sotImpact": True, "prs": []})
+        self.write("src/app.py", "change = 1\n")
+        self.commit("first record")
+        head = self.rev("HEAD")
+        self.git("switch", "-q", "develop")
+        self.assertIn("sot-not-updated", self.run_hook(self.created(), gh=(head, self.base)))
+        for env in ({"FAKE_GH_FAIL": "1"}, {"FAKE_GH_JSON": "not json"}):
+            message = self.run_hook(self.created(), gh=(head, self.base), **env)
+            self.assertTrue(message.startswith("HQ SOT check not run:"), message)
+        self.assertTrue(self.run_hook(self.created("no URL\n")).startswith("HQ SOT check not run:"))
         plain = Path(self.tmp.name) / "plain"
         plain.mkdir()
-        self.assertIsNone(self.run_hook(self.created(), cwd=plain))
+        message = self.run_hook(self.created(), cwd=plain)
+        self.assertTrue(message.startswith("HQ SOT check not run:"), message)
+        self.assertIn("not in a Git repository", message)
 
     def test_invalid_settings_in_the_pr_are_reported(self):
         self.diverging_branch()

@@ -181,10 +181,16 @@ class WipTests(unittest.TestCase):
         self.assertEqual(self.codes(), [("sot-without-record", None)])
         self.record("20261001-small", sot=False)
         self.commit("record says no impact")
-        self.assertEqual(self.codes(), [("impact-mismatch", "20261001-small")])
+        # Judged for the whole change: no record is blamed for an SOT change it may not have made.
+        self.assertEqual(self.codes(), [("impact-mismatch", None)])
+        self.record("20261001-sot", sot=True)
+        self.commit("a record with SOT impact")
+        self.assertEqual(self.codes(), [])
+        self.git("rm", "-rq", "wip/20261001-sot")
         self.write("wip/20261002-broken/status.json", "{")
         self.commit("broken record")
-        self.assertIn(("invalid-status", "20261002-broken"), self.codes())
+        # An unreadable record may be the one with SOT impact; only its status is reported.
+        self.assertEqual(self.codes(), [("invalid-status", "20261002-broken")])
 
     def test_check_pr_checks_the_given_head_commit(self):
         self.git("switch", "-qc", "feat")

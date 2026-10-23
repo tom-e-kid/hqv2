@@ -132,7 +132,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git | 同上 | 項目 7 の導入 |
-| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットについて、作業記録の SOT への影響と SOT の変更を突き合わせる。乖離のおそれ、または確認できなかったことをモデルへ伝える | 作業記録を使うリポジトリ。`gh` で PR を参照できること |
+| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットについて、作業記録の SOT への影響と SOT の変更を突き合わせる。乖離のおそれ、または確認できなかったことをモデルへ伝える | PR の作成を検出したとき。PR の base・head に作業記録がなければ何も出さない |
 | PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
 | 中断 | `Interrupt` | Plugin（Codex のみ） | 監視の中断を記録 | 監視の登録 |

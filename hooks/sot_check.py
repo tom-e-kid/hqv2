@@ -58,9 +58,9 @@ def pull_request_commits(root, url):
     return commits
 
 
-def uses_records(root, *revisions):
+def uses_records(root, base, head):
     """Whether any of the commits keeps work records; an invalid wip.path counts so it is not hidden."""
-    for revision in revisions:
+    for revision in (base, head):
         try:
             path = wip.wip_path(root, revision).as_posix()
         except wip.WipError:
@@ -70,9 +70,16 @@ def uses_records(root, *revisions):
     return False
 
 
-def check(root, event):
+def check(event):
     """Return (URL, result) for the created pull request, None when it keeps no records, or raise Unchecked."""
     repository, url = created_pull_request(event)
+    cwd = event.get("cwd")
+    try:
+        root = wip.repository_root(cwd) if isinstance(cwd, str) and cwd and Path(cwd).is_dir() else None
+    except wip.WipError:
+        root = None
+    if root is None:
+        raise Unchecked("the working directory is not in a Git repository")
     if repository not in remote_repositories(root):
         raise Unchecked("this repository has no remote for the pull request's repository")
     head, base = pull_request_commits(root, url)
@@ -92,18 +99,10 @@ def context(message):
 def handle(event):
     if event.get("hook_event_name") != "PostToolUse" or not creation_candidate(event):
         return None
-    cwd = event.get("cwd")
-    if not isinstance(cwd, str) or not cwd or not Path(cwd).is_dir():
-        return None
     try:
-        root = wip.repository_root(cwd)
-    except wip.WipError:
-        return None  # Without a repository there are no commits to check.
-    try:
-        checked = check(root, event)
+        checked = check(event)
     except Unchecked as error:
-        if not uses_records(root, "HEAD"):
-            return None
+        # Without the PR's commits nothing shows whether it keeps records, so report instead of staying quiet.
         return context(f"HQ SOT check not run: {error}. Run scripts/wip.py check-pr with --base and --head "
                        "set to the pull request's commits to check SOT alignment.")
     except wip.WipError as error:

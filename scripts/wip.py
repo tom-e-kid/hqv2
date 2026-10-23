@@ -159,7 +159,9 @@ FINDINGS = {
     "sot-not-updated": "The record expects an SOT change, but this change updates only the implementation. "
                        "Check the implementation against the SOT; update the SOT with agreement, align the "
                        "implementation, or confirm that an earlier change of this work already updated it.",
-    "impact-mismatch": "This change updates the SOT, but the record says sotImpact is false. Review the judgment.",
+    "impact-mismatch": "This change updates the SOT, but no work record in it has sotImpact true, so the work that "
+                       "changes the SOT cannot be confirmed. The change alone does not tell which record is wrong; "
+                       "find the work that changes the SOT and review its record.",
     "sot-without-record": "This change updates the SOT without a work record in the change. "
                           "Work that changes the SOT needs a record.",
 }
@@ -196,10 +198,11 @@ def check_pr(root, base, head="HEAD"):
             findings.append({"code": "invalid-status", "record": name, "detail": problem})
         elif status["sotImpact"] and implementation and not sot_changed:
             findings.append({"code": "sot-not-updated", "record": name, "detail": FINDINGS["sot-not-updated"]})
-        elif not status["sotImpact"] and sot_changed:
-            findings.append({"code": "impact-mismatch", "record": name, "detail": FINDINGS["impact-mismatch"]})
+    # Touching a record does not mean its work changed the SOT, so an SOT change is judged for the whole change.
     if sot_changed and not records:
         findings.append({"code": "sot-without-record", "record": None, "detail": FINDINGS["sot-without-record"]})
+    elif sot_changed and all(record["status"] and not record["status"]["sotImpact"] for record in records):
+        findings.append({"code": "impact-mismatch", "record": None, "detail": FINDINGS["impact-mismatch"]})
     return {"base": base, "head": head, "sotPath": sot_dir.as_posix(), "sotChanged": sot_changed,
             "implementationChanged": implementation, "records": records, "findings": findings}
 
