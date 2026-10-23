@@ -7,6 +7,8 @@ import re
 from datetime import date
 from pathlib import Path, PurePosixPath
 
+import wip
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -145,6 +147,9 @@ def main(release_ready=False):
         "skills/wip/assets/wip/requirements.md",
         "skills/wip/assets/wip/design.md",
         "skills/wip/assets/wip/tasks.md",
+        "skills/wip/assets/wip/status.json",
+        "skills/sweep/SKILL.md",
+        "scripts/wip.py",
         "skills/gotchas/SKILL.md",
         "skills/git/SKILL.md",
         "skills/git/references/settings.md",
@@ -196,6 +201,12 @@ def main(release_ready=False):
                 require(isinstance(value, str) and value.strip() == value and value, f"{relative}: {key}.path must be a non-empty string")
                 path = PurePosixPath(value)
                 require(not path.is_absolute() and ".." not in path.parts, f"{relative}: {key}.path must stay inside the repository")
+
+    # This repository keeps its own work records; each needs a valid status file.
+    for record in wip.records(ROOT):
+        require(record["problem"] is None, f"{record['path']}: {record['problem']}")
+    template, problem = wip.parse_status((ROOT / "skills/wip/assets/wip/status.json").read_text(encoding="utf-8"))
+    require(problem is None, f"skills/wip/assets/wip/status.json: {problem}")
 
     settings = read_json(".hq/v2/settings.json")
     release = validate_release_settings(settings, ".hq/v2/settings.json", check_files=True)

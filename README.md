@@ -2,12 +2,13 @@
 
 Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
 共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
-現在は次の七つの共通 Skill を収録しています。各 Skill は単独で使用できます。
+現在は次の八つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
 | Skill | 役割 |
 | --- | --- |
 | `sdd` | 壁打ちを通じてプロジェクトの大枠を決め、docs/ に判断基準として残す。後の方針見直しにも使う |
 | `wip` | 具体的な作業の要求・設計・タスクを作業記録に整理し、合意した範囲を実装・検証し、記録から再開する |
+| `sweep` | 作業記録を点検し、完了状態が取り込み先に入った記録の削除と、状態の食い違い・不足の報告を行う |
 | `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 | `git` | Git・GitHub の作業準備、検証を伴うコミット、PR 作成・取り込みを進める |
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
@@ -37,6 +38,7 @@ Codex デスクトップでは登録した `hq-marketplace` を Plugin のブラ
 ```text
 $sdd を使い、プロジェクトの目的・主要要求・基本設計を壁打ちしながら整理してください。
 $wip を使い、合意した大枠に沿って検索機能の改善を相談・実装してください。
+$sweep を使い、完了した作業記録を整理してください。
 $gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 $git を使い、この変更を必要な検証の後にコミットしてください。
 $pr を使い、このブランチの変更を develop 向けの PR にまとめてください。
@@ -68,6 +70,7 @@ claude plugin install hq@hq-marketplace
 ```text
 /hq:sdd
 /hq:wip
+/hq:sweep
 /hq:gotchas
 /hq:git
 /hq:pr
@@ -77,6 +80,7 @@ claude plugin install hq@hq-marketplace
 
 `sdd` には「プロジェクトの大枠を相談したい」、
 `wip` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」、
+`sweep` には「完了した作業記録を整理したい」「削除してよい記録を確認したい」、
 `gotchas` には「今回ハマった点を残したい」「過去の類似問題を確認したい」「古い回避策を整理したい」、
 `git` には「作業ブランチを準備したい」「検証してコミットしたい」「この変更の PR を作成したい」、
 `pr` には「PR 本文を下書きしたい」「既存 PR の説明を現在の差分に合わせたい」、
@@ -205,6 +209,17 @@ AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と�
 - 導入: [AI レビューへの自動対応](#ai-レビューへの自動対応) の手順に従います。修正・push・返信・Resolve の許可範囲は利用者に個別に確認します。
 - 取りやめ: `enabled: false` にします。監視中の PR があれば停止します。
 
+#### 9. 完了した作業記録の定期整理
+
+完了した作業記録は、取り込み後に [sweep](skills/sweep/SKILL.md) で削除します。手動で依頼するほか、利用環境のスケジューラで定期実行できます。HQ がスケジューラへ自動で登録することはありません。
+
+- 状態: 定期タスクの有無は、利用者に利用環境で確認してもらいます。記録の状態は `python3 "<HQ_ROOT>/scripts/wip.py" list --repo .` で確認できます。
+- 導入: 対象リポジトリと実行指示を定期タスクに登録します。許可する変更（編集・コミット・push・PR）を指示に含めます。次は取り込み先が `develop` の場合の例です。
+
+  > このリポジトリの作業記録を HQ の sweep で点検する。取り込み先は origin/develop。削除できる記録があれば削除し、develop 向け PR を作成する。自動マージしない。変更も新しい確認事項もなければ通知しない。
+
+- 取りやめ: 定期タスクを削除します。作業記録と `status.json` はそのまま使えます。
+
 ## 基本の使い方
 
 開発初期は sdd で目的・主要要求・基本設計・技術方針を相談します。その後は wip で一つの目的・範囲を持つ作業を具体化し、実装・検証を進めます。
@@ -212,7 +227,7 @@ AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と�
 | 場所 | 持つもの |
 | --- | --- |
 | docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
-| `wip/YYYYMMDD-<作業名>/` | 取り組んでいる作業と、再開を見込む保留中の作業の要求・設計・受け入れ条件・タスク、判断と結果。完了・取りやめたら削除する。場所は設定で変更できる |
+| `wip/YYYYMMDD-<作業名>/` | 取り組んでいる作業と、再開を見込む保留中の作業の要求・設計・タスク、判断と結果。状態は `status.json` に残し、完了した記録は取り込み後に削除する。場所は設定で変更できる |
 | `GOTCHAS.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処。場所は設定で変更できる |
 | 実装・テスト | 詳細な構造・動作と、その検証 |
 
@@ -393,7 +408,9 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 作業記録と Gotchas は、HQ がなくても読めるプロジェクトの記録として、`.hq/v2/` ではなくプロジェクトのリポジトリ内に置きます。`.hq/v2/` には HQ が解釈する規約・設定だけを置きます。標準の場所と変更方法は [作業記録と Gotchas の保存先](#作業記録と-gotchas-の保存先) にまとめています。
 
-新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
+新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` と `status.json` を標準とし、短い内容は `work.md` に節を分けて統合できます。要求は Goal（何を変えたい・作りたいか）・Context（影響する範囲）・Constraints（守る標準・規約）・Done When（完了とする条件と確認方法）で書きます。`tasks.md` または `work.md` の冒頭に短い概要と詳しい現在地を残します。
+
+`status.json` は状態（`active`・`paused`・`done`）・SOT への影響（`sotImpact`）・PR 番号を持ちます。SOT（docs/）の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断します。作業の規模では決めません。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/work-records.md) にまとめています。
 
 Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
@@ -405,7 +422,7 @@ PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.m
 
 リリースの共通手順は [release](skills/release/SKILL.md) にまとめています。git や wip を先に使う必要はありません。CHANGELOG の整理、互換性に基づくバージョン判断、検証、リリース PR、タグ・公開を扱い、準備の依頼だけで公開へ進みません。利用先のブランチ名や配布基盤を固定せず、[リリース規約例](examples/project/.hq/v2/release.md) と [設定の説明](skills/release/references/settings.md) に沿って適用します。
 
-完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終の状態を記録します。完了にした PR では削除せず、取り込まれた後の別の変更で削除します。squash merge などでは、同じ PR で作成・更新して削除した記録が取り込み先の履歴に残らないためです。取り込み方法は利用先の運用に任せます。再開を見込む当面の保留は、状態と理由を記録して `wip/` に残します。削除した記録は Git の履歴から参照・復元できます。マージをまたぐ記録は `git log --full-history -- <パス>` で探します。終了時の整理手順は [wip の「検証と完了」](skills/wip/SKILL.md#検証と完了) にまとめています。
+完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終の状態を記録します。完了にした PR では削除せず、取り込まれた後の別の変更で削除します。squash merge などでは、同じ PR で作成・更新して削除した記録が取り込み先の履歴に残らないためです。取り込み方法は利用先の運用に任せます。再開を見込む当面の保留は、状態と理由を記録して `wip/` に残します。削除した記録は Git の履歴から参照・復元できます。マージをまたぐ記録は `git log --full-history -- <パス>` で探します。終了時の整理手順は [wip の「検証と完了」](skills/wip/SKILL.md#検証と完了) にまとめています。取り込み後の削除の判断と実施は [sweep](skills/sweep/SKILL.md) が担います。
 
 作業記録はコードや関連文書とともに Git 管理します。本文は現在地と判断理由・検証結果を示し、変更の経緯は Git history に残します。コミットのタイミングと単位はプロジェクトの規約やユーザーの指示に従います。
 
@@ -507,9 +524,9 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 ### 作業メモの週次整理（HQ 開発専用・試行）
 
-開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `wip/` を点検し、状態更新・維持・削除を判断します。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
+開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) の基準で点検し、完了記録の削除と状態の更新・報告を行います。判断の基準は sweep に一本化し、この Skill は develop 向け PR・並行実行の防止・通知などの HQ 固有の条件だけを持ちます。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
 
-このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。汎用化と共通 Plugin への収録は試行後に判断します。
+このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。
 
 タスクには対象 checkout と、次の実行指示を設定します。評価・整理の基準は Skill に集約します。
 
@@ -539,7 +556,9 @@ skills/sdd/
   assets/docs/                      全体仕様の雛形
 skills/wip/
   SKILL.md                          作業の具体化・実装・検証・再開
-  assets/wip/                       作業文書の雛形
+  assets/wip/                       作業文書と status.json の雛形
+skills/sweep/
+  SKILL.md                          完了した作業記録の整理と状態の点検
 skills/gotchas/
   SKILL.md                          落とし穴の参照・記録・整理
 skills/git/
@@ -561,6 +580,7 @@ docs/pr-feedback.md                 オプトインと運用・検証
 hooks/git/pre-commit                Git Hook の配布用雛形
 scripts/commit_security.py           コミット対象のセキュリティチェック
 scripts/setup_security.py            Git Hook の導入・更新・状態確認
+scripts/wip.py                       作業記録の一覧と削除できる記録の判定
 docs/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
 ```
