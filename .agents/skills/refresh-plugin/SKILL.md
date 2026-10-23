@@ -53,7 +53,7 @@ codex plugin list --marketplace hq-marketplace --json
 2. 他のリポジトリでも使う user scope を対象に、最新化したルートで以下を一つずつ実行する。未導入の場合も user scope に導入する。
 
    ```bash
-   claude plugin marketplace add .
+   claude plugin marketplace add ./
    claude plugin marketplace update hq-marketplace
    claude plugin install hq@hq-marketplace --scope user
    claude plugin marketplace list --json
