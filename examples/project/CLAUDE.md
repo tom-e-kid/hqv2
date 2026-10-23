@@ -3,7 +3,7 @@
 @AGENTS.md
 
 大枠の策定・見直しは `/hq:sdd`、具体的な作業の相談・実装・検証・再開は
-`/hq:steering`、落とし穴の参照・記録・整理は `/hq:gotchas`、Git・GitHub の作業準備・コミット・PR・取り込みは
+`/hq:wip`、落とし穴の参照・記録・整理は `/hq:gotchas`、Git・GitHub の作業準備・コミット・PR・取り込みは
 `/hq:git`、PR のタイトル・本文の整理と作成・更新は `/hq:pr`、CHANGELOG・バージョンの整理とリリース準備・公開は `/hq:release` で明示的に依頼できる。
 各 Skill は単独で使え、順番に呼ぶことは必須ではない。
 

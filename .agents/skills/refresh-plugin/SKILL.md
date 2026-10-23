@@ -10,7 +10,7 @@ description: HQ 開発リポジトリを develop の最新状態に切り替え�
 ## checkout を確認し、develop を最新化する
 
 1. CWD から `git rev-parse --show-toplevel` でルートを取得し、この Skill 本体がある HQ checkout と同じであることを確認する。シンボリックリンク経由では実体のパスで照合する。別のリポジトリなら停止する。
-2. ルートの `AGENTS.md` を読み、`GOTCHAS.md` や既存の同等の記録があれば関連項目を参照する。`origin` が HQ のリポジトリを指すこと、現在のブランチ、未コミット変更と進行中の Git 操作を確認する。
+2. ルートの `AGENTS.md` を読み、Gotchas の記録（`.hq/v2/settings.json` の `gotchas.path`、未指定は `GOTCHAS.md`）や既存の同等の記録があれば関連項目を参照する。`origin` が HQ のリポジトリを指すこと、現在のブランチ、未コミット変更と進行中の Git 操作を確認する。
 3. 未追跡を含む未コミット変更、merge・rebase 等の進行中の操作があれば停止する。自動で stash・コミット・破棄しない。別 worktree が `develop` を使用している場合も、その checkout は操作せず停止する。
 4. 以下をルートで一つずつ実行する。各コマンドが成功した場合だけ次へ進む。
 

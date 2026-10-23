@@ -5,11 +5,11 @@ description: HQ 自体の作業メモを定期点検し、状態更新・維持�
 
 # HQ の作業メモを点検・整理する
 
-HQ checkout の `wip/` を点検する。手動でも定期実行でも同じ判断基準を使う。Plugin 利用先の巡回、既存の worktree・作業ブランチの削除、Issue のクローズ、自動マージは行わない。定期タスクからの実行依頼は、この範囲の編集・コミット・push・PR 作成と更新の許可として扱う。読み取り確認だけの依頼では変更しない。
+HQ checkout の作業記録（`.hq/v2/settings.json` の `wip.path`、未指定は `wip/`。以下 `wip/`）を点検する。手動でも定期実行でも同じ判断基準を使う。Plugin 利用先の巡回、既存の worktree・作業ブランチの削除、Issue のクローズ、自動マージは行わない。定期タスクからの実行依頼は、この範囲の編集・コミット・push・PR 作成と更新の許可として扱う。読み取り確認だけの依頼では変更しない。
 
 ## 開始と重複防止
 
-1. CWD の Git ルート・origin が HQ (`tom-e-kid/hqv2`) であることを確認する。[AGENTS.md](../../../AGENTS.md)、[Git 規約](../../../.hq/v2/git.md)、[設定](../../../.hq/v2/settings.json) を読む。`GOTCHAS.md` または同等の記録があれば関連項目を参照する。
+1. CWD の Git ルート・origin が HQ (`tom-e-kid/hqv2`) であることを確認する。[AGENTS.md](../../../AGENTS.md)、[Git 規約](../../../.hq/v2/git.md)、[設定](../../../.hq/v2/settings.json) を読む。Gotchas の記録（`.hq/v2/settings.json` の `gotchas.path`、未指定は `GOTCHAS.md`）または同等の記録があれば関連項目を参照する。
 2. `git worktree list --porcelain`、ブランチ、未コミット変更、進行中の Git 操作と、develop 向けの open PR を確認する。既存の作業メモ整理 PR は head 名だけでなく目的・差分でも照合する。人間が閉じた未マージ PR を自動で再作成せず、その理由を確認する。
 3. 同一の点検が並行して走らないよう、基準 checkout の `.hq/v2/.ignore/work-maintenance/lock/` を原子的なディレクトリ作成で取得する。保持者と開始時刻を記録し、終了時に自分のロックだけ解放する。既存ロックは奪わず今回を見送る。中断後に残ったロックは保持者の終了を確認するまで削除しない。
 4. origin を fetch し、最新の `origin/develop` を評価の基準にする。主 checkout のブランチ切り替え・pull・stash は行わない。変更が必要になったら、AGENTS.md の指定配置に develop 系列から専用ブランチ・worktree を準備する。既存の整理 PR があれば対応するブランチ・worktree を再利用する。
@@ -31,7 +31,7 @@ API・認証・fetch の失敗を「変更なし」と扱わない。確認で�
 
 ## 分類と変更
 
-[steering の完了・中断方針](../../../skills/steering/SKILL.md) に沿って分類する。
+[wip の完了・中断方針](../../../skills/wip/SKILL.md) に沿って分類する。
 
 | 分類 | 条件と実施内容 |
 | --- | --- |
