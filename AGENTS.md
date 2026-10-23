@@ -10,7 +10,7 @@
 
 ## 構成と責務
 
-- 共通 Skill は `skills/<skill-name>/` に置く。大枠の策定・見直しは `skills/sdd/`、具体的な作業の相談・実装・検証・再開は `skills/steering/`、プロジェクトの落とし穴の参照・記録・整理は `skills/gotchas/`、Git・GitHub の作業準備・コミット・取り込みは `skills/git/`、PR の作成・更新と書式は `skills/pr/`、AI Reviewer の指摘への対応・再確認は `skills/pr-feedback/`、CHANGELOG・バージョンの整理とリリースは `skills/release/` が担う。
+- 共通 Skill は `skills/<skill-name>/` に置く。大枠の策定・見直しは `skills/sdd/`、具体的な作業の相談・実装・検証・再開は `skills/wip/`、プロジェクトの落とし穴の参照・記録・整理は `skills/gotchas/`、Git・GitHub の作業準備・コミット・取り込みは `skills/git/`、PR の作成・更新と書式は `skills/pr/`、AI Reviewer の指摘への対応・再確認は `skills/pr-feedback/`、CHANGELOG・バージョンの整理とリリースは `skills/release/` が担う。
 - Claude Code の agent 定義はルートの `agents/` に置く。`skills/<skill-name>/agents/` に置く Skill の付属メタデータとは区別する。
 - このリポジトリの開発専用 Skill は `.agents/skills/<skill-name>/` に置き、Claude Code 用に `.claude/skills/<skill-name>` から相対シンボリックリンクを張る。Plugin として配布する共通 Skill とは分ける。
 - Hooks・MCP などの追加機能は、対象製品が対応する形式・配置を確認して追加する。製品ごとに形式が異なる場合は設定を分ける。使わない機能の空ディレクトリや仮の定義は作らない。
@@ -22,7 +22,7 @@
 - 各 Skill は単独で使えるようにし、別 Skill の実行を前提にしない。
 - 共通 Skill は製品固有のツール名・特定のモデル・agent・Hooks に依存させない。特定の技術スタック向けの内容は、対象を明示した Skill や製品固有の定義として追加する。
 - 製品固有の機能は対象製品と役割を明記する。両製品に同じ機能があると仮定せず、共通 Skill の手順を複製しない。
-- Skill の追加時は、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載する。知見の標準保存先は利用先プロジェクトの `.hq/v2/references/gotchas.md` とし、既存の同等の記録を尊重して Skill を跨いで共有する。記録・選別・整理の手順は `gotchas` にまとめ、他の Skill に複製しない。別 Skill の呼び出しは必須にしない。プロジェクト固有の知見は Plugin に蓄積せず、Skill 自体の問題は共通手順の改善として扱う。
+- Skill の追加時は、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載する。知見の保存先は利用先の `.hq/v2/settings.json` の `gotchas.path`、未指定ならルートの `GOTCHAS.md` とし、既存の同等の記録を尊重して Skill を跨いで共有する。案内には同じ設定キーと標準値を示す。記録・選別・整理の手順は `gotchas` にまとめ、他の Skill に複製しない。別 Skill の呼び出しは必須にしない。プロジェクト固有の知見は Plugin に蓄積せず、Skill 自体の問題は共通手順の改善として扱う。
 - Skill が案内する開発手順では、要求・設計をまとめて合意してから実装へ進む標準を維持する。大枠と作業の詳細を混同しない。
 - 手順の変更時は参照文書、テンプレート、プロジェクト側の記載例との整合性を確認する。構成要素の追加時は対応製品・配置・使い方を README に反映する。
 

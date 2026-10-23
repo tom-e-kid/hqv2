@@ -7,7 +7,7 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | Skill | 役割 |
 | --- | --- |
 | `sdd` | 壁打ちを通じてプロジェクトの大枠を決め、docs/ に判断基準として残す。後の方針見直しにも使う |
-| `steering` | 具体的な作業の要求・設計・タスクを整理し、合意した範囲を実装・検証し、記録から再開する |
+| `wip` | 具体的な作業の要求・設計・タスクを作業記録に整理し、合意した範囲を実装・検証し、記録から再開する |
 | `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 | `git` | Git・GitHub の作業準備、検証を伴うコミット、PR 作成・取り込みを進める |
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
@@ -36,7 +36,7 @@ Codex デスクトップでは登録した `hq-marketplace` を Plugin のブラ
 
 ```text
 $sdd を使い、プロジェクトの目的・主要要求・基本設計を壁打ちしながら整理してください。
-$steering を使い、合意した大枠に沿って検索機能の改善を相談・実装してください。
+$wip を使い、合意した大枠に沿って検索機能の改善を相談・実装してください。
 $gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 $git を使い、この変更を必要な検証の後にコミットしてください。
 $pr を使い、このブランチの変更を develop 向けの PR にまとめてください。
@@ -67,7 +67,7 @@ claude plugin install hq@hq-marketplace
 
 ```text
 /hq:sdd
-/hq:steering
+/hq:wip
 /hq:gotchas
 /hq:git
 /hq:pr
@@ -76,7 +76,7 @@ claude plugin install hq@hq-marketplace
 ```
 
 `sdd` には「プロジェクトの大枠を相談したい」、
-`steering` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」、
+`wip` には「この機能追加の要求・設計を相談したい」「既存の作業記録から実装を再開したい」、
 `gotchas` には「今回ハマった点を残したい」「過去の類似問題を確認したい」「古い回避策を整理したい」、
 `git` には「作業ブランチを準備したい」「検証してコミットしたい」「この変更の PR を作成したい」、
 `pr` には「PR 本文を下書きしたい」「既存 PR の説明を現在の差分に合わせたい」、
@@ -153,6 +153,7 @@ HQ は checkout 固有の設定、worktree、AI レビュー対応の報告フ�
 
 - 状態: `AGENTS.md`・`CLAUDE.md` の有無と、HQ の Skill の適用方針の記載。
 - 導入: [AGENTS.md の例](examples/project/AGENTS.md) の「大枠と作業の関係」「Skill の適用」「文書の配置」を既存の指示へ統合します。Claude Code では [CLAUDE.md の例](examples/project/CLAUDE.md) も使えます。丸ごと上書きしません。
+- 変更: 作業記録（標準 `wip/`）や Gotchas（標準 `GOTCHAS.md`）の場所を変える場合は、[保存先の設定](#作業記録と-gotchas-の保存先) を `.hq/v2/settings.json` に記録し、指示ファイルの記載も同じパスに合わせます。
 - 取りやめ: 足した記述を示して確認し、削除します。
 
 #### 3. Git の規約と既定値
@@ -206,23 +207,22 @@ AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と�
 
 ## 基本の使い方
 
-開発初期は sdd で目的・主要要求・基本設計・技術方針を相談します。その後は steering で一つの目的・範囲を持つ作業を具体化し、実装・検証を進めます。
+開発初期は sdd で目的・主要要求・基本設計・技術方針を相談します。その後は wip で一つの目的・範囲を持つ作業を具体化し、実装・検証を進めます。
 
 | 場所 | 持つもの |
 | --- | --- |
 | docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
-| `.hq/v2/work/active/YYYYMMDD-<作業名>/` | 取り組んでいる、または近いうちに再開する作業の要求・設計・受け入れ条件・タスク、判断と結果 |
-| `.hq/v2/work/archived/YYYYMMDD-<作業名>/` | 再開を見込む当面の保留や、継続して参照する価値がある作業記録 |
-| `.hq/v2/references/gotchas.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処 |
+| `wip/YYYYMMDD-<作業名>/` | 取り組んでいる作業と、再開を見込む保留中の作業の要求・設計・受け入れ条件・タスク、判断と結果。完了・取りやめたら削除する。場所は設定で変更できる |
+| `GOTCHAS.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処。場所は設定で変更できる |
 | 実装・テスト | 詳細な構造・動作と、その検証 |
 
 作業単位はセッション単位ではありません。同じ作業を複数セッションで続けられます。
 
-steering は会話と依頼内容を中心に、ブランチ情報や記録の概要・状態から対応する作業を判断します。対象が明らかなら毎回の指定は不要で、候補を区別できない場合だけ確認します。通常は active の候補を絞って対象の記録を読み、archived は過去の判断の参照や再開に必要な場合に確認します。ブランチ名を作業選択の唯一の根拠にはしません。
+wip は会話と依頼内容を中心に、ブランチ情報や記録の概要・状態から対応する作業を判断します。対象が明らかなら毎回の指定は不要で、候補を区別できない場合だけ確認します。通常は `wip/` の候補を概要・状態で絞り、対象の記録を読みます。ブランチ名を作業選択の唯一の根拠にはしません。
 
 docs/ の大枠が変わる場合は相談・合意して更新します。大枠の中で決める詳細を逐一 docs/ へ転記する必要はありません。例えば、既存方針に沿ったインデックス追加は作業記録と実装に残し、検索対象や権限方針の変更は関連する大枠へ反映します。
 
-各 Skill は単独で使えます。steering から大枠を変更する場合も、その変更を相談して docs/ に反映でき、sdd の呼び出しは必須ではありません。広い方針の見直しには sdd が使えます。
+各 Skill は単独で使えます。wip から大枠を変更する場合も、その変更を相談して docs/ に反映でき、sdd の呼び出しは必須ではありません。広い方針の見直しには sdd が使えます。
 
 要求・設計はまとめて合意してから実装へ進みます。同じ範囲の合意を求め直さず、文書ごとの承認を標準にしません。相談・記録だけの依頼では実装へ進みません。
 
@@ -391,9 +391,11 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 新規の標準名は `docs/{PRD,FDS,ADD}.md` です。既存の同等文書はそのまま使い、二重管理しません。
 [文書の役割](skills/sdd/references/document-roles.md) に粒度と分担を定義しています。
 
-新しい作業記録は `.hq/v2/work/active/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
+作業記録と Gotchas は、HQ がなくても読めるプロジェクトの記録として、`.hq/v2/` ではなくプロジェクトのリポジトリ内に置きます。`.hq/v2/` には HQ が解釈する規約・設定だけを置きます。標準の場所と変更方法は [作業記録と Gotchas の保存先](#作業記録と-gotchas-の保存先) にまとめています。
 
-Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、steering の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
+新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` を標準とし、短い内容は `work.md` に節を分けて統合できます。`tasks.md` または `work.md` の冒頭に短い概要と状態を残します。ブランチ・PR・検証などの規約はプロジェクト側で定め、各 Skill はそれに従います。
+
+Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
 利用先の AGENTS.md には適用方針と参照先を残し、検証・PR 省略条件は [.hq/v2/git.md の例](examples/project/.hq/v2/git.md) を既存文書へ統合します。lint・型チェック・クリーンビルド・単体テストなどを一律に必須とせず、プロジェクトごとに適用条件と実在するコマンドを定めます。環境・テスト・配布ツールという分類だけで PR を省略しません。
 
@@ -401,15 +403,15 @@ Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめていま
 
 PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.md) で扱います。独自書式がなければ [標準本文](skills/pr/assets/pr-body.md) を使い、利用先に `.hq/v2/pr.md` があればその指示・書式を優先します。指定がない部分だけ既存の PR テンプレートや標準書式で補い、独自書式へ標準の見出しを重ねません。[利用先向けの記載例](examples/project/.hq/v2/pr.md) は必要な場合に統合し、指示ファイルの作成や他の Skill の実行を必須にしません。
 
-リリースの共通手順は [release](skills/release/SKILL.md) にまとめています。git や steering を先に使う必要はありません。CHANGELOG の整理、互換性に基づくバージョン判断、検証、リリース PR、タグ・公開を扱い、準備の依頼だけで公開へ進みません。利用先のブランチ名や配布基盤を固定せず、[リリース規約例](examples/project/.hq/v2/release.md) と [設定の説明](skills/release/references/settings.md) に沿って適用します。
+リリースの共通手順は [release](skills/release/SKILL.md) にまとめています。git や wip を先に使う必要はありません。CHANGELOG の整理、互換性に基づくバージョン判断、検証、リリース PR、タグ・公開を扱い、準備の依頼だけで公開へ進みません。利用先のブランチ名や配布基盤を固定せず、[リリース規約例](examples/project/.hq/v2/release.md) と [設定の説明](skills/release/references/settings.md) に沿って適用します。
 
-完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終内容を Git に残してから削除します。再開を見込む当面の保留や、継続して参照する価値がある記録は `archived/` に保持できます。終了時の整理手順は [steering の「検証と完了」](skills/steering/SKILL.md#検証と完了) にまとめています。保存先は `.hq/v2/work/` に統一し、Skill 名は steering のままとします。記録の移動時は関連する参照も更新し、旧保存先に同じ記録を残しません。
+完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終の状態を記録します。完了にした PR では削除せず、取り込まれた後の別の変更で削除します。squash merge などでは、同じ PR で作成・更新して削除した記録が取り込み先の履歴に残らないためです。取り込み方法は利用先の運用に任せます。再開を見込む当面の保留は、状態と理由を記録して `wip/` に残します。削除した記録は Git の履歴から参照・復元できます。マージをまたぐ記録は `git log --full-history -- <パス>` で探します。終了時の整理手順は [wip の「検証と完了」](skills/wip/SKILL.md#検証と完了) にまとめています。
 
 作業記録はコードや関連文書とともに Git 管理します。本文は現在地と判断理由・検証結果を示し、変更の経緯は Git history に残します。コミットのタイミングと単位はプロジェクトの規約やユーザーの指示に従います。
 
-Gotchas は利用先プロジェクトのルートを基準とする `.hq/v2/references/gotchas.md` に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先し、Skill ごとの旧保存先も勝手に移動・重複作成しません。
+Gotchas は利用先プロジェクトの `GOTCHAS.md`（`gotchas.path` で変更可）に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先します。
 
-`sdd`・`steering`・`git`・`pr`・`pr-feedback`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
+`sdd`・`wip`・`git`・`pr`・`pr-feedback`・`release` は開始時の確認事項として関連項目を参照します。記録・選別・整理の手順は [gotchas](skills/gotchas/SKILL.md) にまとめ、単独で使って依頼できます。他の Skill からの呼び出しは必須ではありません。記録には発生条件・問題・対処・確認状況と根拠を残し、必要な知見が見つかった時に作成します。空ファイルは一律に作りません。
 
 Gotchas は対象領域で分類し、見出しや本文に操作・技術名・症状・エラー文を含め、作業時に関連項目を検索しやすくします。有効・未確認・解消済みなどの状態は分類と分けて管理します。手動・定期タスク共通の [定期見直し手順と依頼例](skills/gotchas/references/maintenance.md) を用意しています。スケジューラは利用環境で設定し、HQ が自動登録することはありません。分類の整理だけで内容の確認日を更新せず、変更や新しい要確認事項がない実行は通知を繰り返しません。
 
@@ -417,6 +419,28 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 
 アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
+
+### 作業記録と Gotchas の保存先
+
+標準の場所はルートの `wip/` と `GOTCHAS.md` です。別の場所にする場合は、Git 管理する共有設定 `.hq/v2/settings.json` に記録します。値はリポジトリのルートからの相対パスで、指定した項目だけが変わります。
+
+```json
+{
+  "wip": {
+    "path": "work"
+  },
+  "gotchas": {
+    "path": "notes/gotchas.md"
+  }
+}
+```
+
+- `wip.path`: 作業記録を置くディレクトリ。未指定なら `wip`。
+- `gotchas.path`: Gotchas を記録するファイル。未指定なら `GOTCHAS.md`。
+- チームで同じ場所を使うため、checkout 固有の `.hq/v2/.ignore/settings.json` では変更しません。
+- 値が文字列でない、空、絶対パス、`..` を含む場合、各 Skill は標準値に戻さず問題を伝えます。
+- 指定した場所が `.gitignore` などで Git 管理から外れていないか確認します。例えば、トップレベルの `work/` を無視しているリポジトリで `work` を指定すると、記録が共有されません。
+- 場所を変えても既存の記録は自動で移動しません。必要なら `git mv` で移し、指示ファイルの記載も合わせます。
 
 ### worktree の標準運用をプロジェクトに合わせる
 
@@ -483,7 +507,7 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 ### 作業メモの週次整理（HQ 開発専用・試行）
 
-開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `.hq/v2/work/` を点検し、状態更新・active 維持・archived への移動・削除を判断します。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
+開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `wip/` を点検し、状態更新・維持・削除を判断します。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
 
 このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。汎用化と共通 Plugin への収録は試行後に判断します。
 
@@ -493,8 +517,8 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
-最新の責務と文書の粒度は [刷新の設計記録](.hq/v2/work/archived/20261013-skill-refresh/design.md) に整理しています。
-Plugin の構成と配布名の見直しは [構成の見直し記録](.hq/v2/work/archived/20261013-plugin-structure/work.md) に残しています。
+責務と文書の粒度を刷新した際の判断は [刷新の設計記録](https://github.com/tom-e-kid/hqv2/blob/87825a31cbb9381649e08601ed8bd9f1b89b2680/.hq/v2/work/archived/20261013-skill-refresh/design.md) に残っています。
+Plugin の構成と配布名の見直しは [構成の見直し記録](https://github.com/tom-e-kid/hqv2/blob/87825a31cbb9381649e08601ed8bd9f1b89b2680/.hq/v2/work/archived/20261013-plugin-structure/work.md) に残っています。どちらも完了した記録のため、削除前のコミットを参照します。
 
 ## 構成
 
@@ -513,9 +537,9 @@ skills/sdd/
   SKILL.md                          共通の入口
   references/                       大枠の策定・見直し・文書ルール
   assets/docs/                      全体仕様の雛形
-skills/steering/
+skills/wip/
   SKILL.md                          作業の具体化・実装・検証・再開
-  assets/steering/                   作業文書の雛形
+  assets/wip/                       作業文書の雛形
 skills/gotchas/
   SKILL.md                          落とし穴の参照・記録・整理
 skills/git/

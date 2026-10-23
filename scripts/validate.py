@@ -5,7 +5,7 @@ import argparse
 import json
 import re
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -141,10 +141,10 @@ def main(release_ready=False):
         "skills/sdd/assets/docs/PRD.md",
         "skills/sdd/assets/docs/FDS.md",
         "skills/sdd/assets/docs/ADD.md",
-        "skills/steering/SKILL.md",
-        "skills/steering/assets/steering/requirements.md",
-        "skills/steering/assets/steering/design.md",
-        "skills/steering/assets/steering/tasks.md",
+        "skills/wip/SKILL.md",
+        "skills/wip/assets/wip/requirements.md",
+        "skills/wip/assets/wip/design.md",
+        "skills/wip/assets/wip/tasks.md",
         "skills/gotchas/SKILL.md",
         "skills/git/SKILL.md",
         "skills/git/references/settings.md",
@@ -189,6 +189,13 @@ def main(release_ready=False):
         if "commitSecurity" in settings:
             section = settings["commitSecurity"]
             require(isinstance(section, dict) and isinstance(section.get("required"), bool), f"{relative}: commitSecurity.required must be a boolean")
+        for key in ("wip", "gotchas"):
+            if key in settings:
+                section = settings[key]
+                value = section.get("path") if isinstance(section, dict) else None
+                require(isinstance(value, str) and value.strip() == value and value, f"{relative}: {key}.path must be a non-empty string")
+                path = PurePosixPath(value)
+                require(not path.is_absolute() and ".." not in path.parts, f"{relative}: {key}.path must stay inside the repository")
 
     settings = read_json(".hq/v2/settings.json")
     release = validate_release_settings(settings, ".hq/v2/settings.json", check_files=True)

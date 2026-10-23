@@ -9,5 +9,11 @@
     "changelog": "CHANGELOG.md",
     "tagPrefix": "v",
     "versionFiles": []
+  },
+  "wip": {
+    "path": "wip"
+  },
+  "gotchas": {
+    "path": "GOTCHAS.md"
   }
 }

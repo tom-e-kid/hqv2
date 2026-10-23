@@ -16,7 +16,7 @@ worktree の作成方針・配置・保持方針は `AGENTS.md` または参照�
 
 ## 設定項目と優先順位
 
-JSON のルートは object とし、他の Skill の設定があっても保持する。Git 用の項目は `git` の下に置く。コミット前チェックの採用宣言 `commitSecurity` は [導入手順](../../../docs/commit-security.md#採用を宣言する) に従う。
+JSON のルートは object とし、他の Skill の設定があっても保持する。Git 用の項目は `git` の下に置く。コミット前チェックの採用宣言 `commitSecurity` は [導入手順](../../../docs/commit-security.md#採用を宣言する)、作業記録と Gotchas の保存先 `wip.path`・`gotchas.path` は [README](../../../README.md#作業記録と-gotchas-の保存先) に従う。
 
 - `remote`: 取り込み先リポジトリの remote 名。例: `origin`。
 - `baseBranch`: 新規作業の既定ベース。例: `develop`。

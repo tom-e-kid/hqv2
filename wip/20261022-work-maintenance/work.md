@@ -13,6 +13,8 @@
 - マージ済みだけで作業全体を完了にしない。不明なものは保持する。
 - 今回は作業メモを対象とし、既存 worktree・ブランチの削除は対象外。
 
+2026-10-23、作業記録の保存先を `wip/` の一階層に変更し、active/archived の区別を廃止した。これに合わせ、Skill の分類を「維持・削除」に変更した。上記の「active 維持、archived への移動」は当時の合意として残す。
+
 ## 設計とタスク
 
 `.agents/skills/work-maintenance/SKILL.md` に手順を集約し、Claude Code 用の相対シンボリックリンクを置く。定期タスクには対象 checkout と Skill の実行指示を置く。Skill が develop に取り込まれる前は整理を実行しない。
