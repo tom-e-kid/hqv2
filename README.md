@@ -1,7 +1,7 @@
 # HQ
 
 Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援する機能をまとめた Plugin です。
-共通の手法は Skill として提供し、Claude Code の agent など製品固有の機能も必要に応じて収録します。
+共通の手法は Skill として提供し、Claude Code の agent などツール固有の機能も必要に応じて収録します。
 現在は次の八つの共通 Skill を収録しています。各 Skill は単独で使用できます。
 
 | Skill | 役割 |
@@ -12,10 +12,10 @@ Codex・Claude Code 向けに、開発の経験とノウハウ、開発を支援
 | `gotchas` | プロジェクトの落とし穴を参照・記録し、重複・古い回避策を整理する |
 | `git` | Git・GitHub の作業準備、検証を伴うコミット、PR 作成・取り込みを進める |
 | `pr` | PR のタイトル・本文を整理し、利用先の指示・書式に従って作成・更新する |
-| `pr-feedback` | AI Reviewer の指摘の待機・分類・修正・理由付き返信・Resolve と再確認を上限付きで行う |
+| `pr-feedback` | AI レビュアーの指摘の待機・分類・修正・理由付き返信・Resolve と再確認を上限付きで行う |
 | `release` | CHANGELOG・バージョン・公開対象を整理し、リリース準備・公開を進める |
 
-[導入](#導入) · [利用先のセットアップ](#利用先のセットアップ) · [基本の使い方](#基本の使い方) · [AI レビュー対応の設定](#ai-レビューへの自動対応) · [コミット前チェックの導入](#コミット前のセキュリティチェック) · [利用先の設定](#利用先プロジェクトの設定)
+[導入](#導入) · [利用先のセットアップ](#利用先のセットアップ) · [基本の使い方](#基本の使い方) · [AI レビュー対応の設定](#ai-レビューへの自動対応) · [コミット前チェックの導入](#コミット前チェック) · [利用先の設定](#利用先プロジェクトの設定)
 
 ## 導入
 
@@ -42,7 +42,7 @@ $sweep を使い、完了した作業記録を整理してください。
 $gotchas を使い、今回ハマった点をプロジェクトの知見として残してください。
 $git を使い、この変更を必要な検証の後にコミットしてください。
 $pr を使い、このブランチの変更を develop 向けの PR にまとめてください。
-$pr-feedback を使い、この PR の AI レビュー指摘に対応してください。
+$pr-feedback を使い、この PR の AI レビュアーの指摘に対応してください。
 $release を使い、今回の公開対象とバージョンを整理してリリース準備をしてください。
 ```
 
@@ -88,11 +88,11 @@ claude plugin install hq@hq-marketplace
 
 ## 利用先のセットアップ
 
-利用先リポジトリでの設定が必要な機能を、項目ごとに選んで設定します。どの項目も現在の状態の確認から始めるため、同じ手順を何度実行しても、設定済みの項目は変わりません。後から項目を追加・変更・取りやめる場合も同じ手順を使います。
+利用先プロジェクトでの設定が必要な機能を、項目ごとに選んで設定します。どの項目も現在の状態の確認から始めるため、同じ手順を何度実行しても、設定済みの項目は変わりません。後から項目を追加・変更・取りやめる場合も同じ手順を使います。
 
 ### 導入プロンプト
 
-HQ をインストールした後、利用先リポジトリで新しいセッションを開始し、次の文を貼り付けます。Codex・Claude Code のどちらでも使えます。
+HQ をインストールした後、利用先プロジェクトで新しいセッションを開始し、次の文を貼り付けます。Codex・Claude Code のどちらでも使えます。
 
 ```text
 HQ Plugin でこのリポジトリをセットアップしたい。
@@ -121,24 +121,24 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | --- | --- | --- |
 | 実行するもの | Codex・Claude Code | Git |
 | 対象 | そのセッションでのエージェントの操作 | 人・IDE・エージェントを問わない、そのリポジトリの Git 操作 |
-| 有効になる条件 | Plugin の読み込み。Codex は Hook 定義の信頼も必要 | clone ごとの導入 |
+| 有効になる条件 | Plugin の読み込み。Codex は Plugin Hook 定義の信頼も必要 | clone ごとの導入 |
 | HQ での用途 | 状態の通知、作成した PR の SSOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
 
 開発の流れの中で HQ の Hook が動く箇所です。
 
-| タイミング | Hook | 種類 | HQ の処理 | 動作する条件 |
+| タイミング | イベント名 | 種類 | HQ の処理 | 動作する条件 |
 | --- | --- | --- | --- | --- |
-| セッション開始 | `SessionStart` | Plugin | コミット前チェックの導入状態を読み、問題があればエージェントへ通知。書き込みはしない | 常に動作。未導入の通知は[項目 7](#7-コミット前セキュリティチェック) の採用宣言がある場合だけ |
-| コミット | `pre-commit` | Git | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
-| 自動マージ | `pre-merge-commit` | Git | 同上 | 項目 7 の導入 |
-| `git am` | `pre-applypatch` | Git | 同上 | 項目 7 の導入 |
-| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットを判定する。SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていなければ、SSOT の確認・更新が必要か確かめるようモデルへ伝える。判定できない理由や確認できなかったことも伝える | PR の作成を検出したとき。PR の head で SSOT が未登録なら何も出さない |
-| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
-| ターン終了 | `Stop` | Plugin | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
-| 中断 | `Interrupt` | Plugin（Codex のみ） | 監視の中断を記録 | 監視の登録 |
-| セッション終了 | `SessionEnd` | Plugin | 監視を停止 | 監視の登録 |
+| セッション開始 | `SessionStart` | Plugin Hook | コミット前チェックの導入状態を読み、問題があればエージェントへ通知。書き込みはしない | 常に動作。未導入の通知は[項目 7](#7-コミット前チェック) の採用宣言がある場合だけ |
+| コミット | `pre-commit` | Git Hook | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
+| 自動マージ | `pre-merge-commit` | Git Hook | 同上 | 項目 7 の導入 |
+| `git am` | `pre-applypatch` | Git Hook | 同上 | 項目 7 の導入 |
+| PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットを判定する。SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていなければ、SSOT の確認・更新が必要か確かめるようモデルへ伝える。判定できない理由や確認できなかったことも伝える | PR の作成を検出したとき。PR の head で SSOT が未登録なら何も出さない |
+| PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
+| ターン終了 | `Stop` | Plugin Hook | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
+| 中断 | `Interrupt` | Plugin Hook（Codex のみ） | 監視の中断を記録 | 監視の登録 |
+| セッション終了 | `SessionEnd` | Plugin Hook | 監視を停止 | 監視の登録 |
 
-`git cherry-pick`・`git rebase`・`git revert` が作るコミットと、`--no-verify` を付けたコミットでは、HQ の Git Hook は実行されません。push 時の検査はなく、GitHub 上で作るコミットにはローカルの Hook が働きません。漏れを許容できない場合は、サーバー側の必須 CI やシークレット検出を併用します。Plugin Hook はセッションを閉じた後は動かず、別ターミナルやブラウザで作成した PR も自動登録しません。
+`git cherry-pick`・`git rebase`・`git revert` が作るコミットと、`--no-verify` を付けたコミットでは、HQ の Git Hook は実行されません。push 時の検査はなく、GitHub 上で作るコミットにはローカルの Git Hook が働きません。漏れを許容できない場合は、サーバー側の必須 CI やシークレット検出を併用します。Plugin Hook はセッションを閉じた後は動かず、別ターミナルやブラウザで作成した PR も自動登録しません。
 
 ### 項目
 
@@ -193,20 +193,20 @@ HQ は checkout 固有の設定、worktree、AI レビュー対応の報告フ�
 - 導入: [worktree の標準運用をプロジェクトに合わせる](#worktree-の標準運用をプロジェクトに合わせる) と [worktree に開発用のローカル設定を用意する](#worktree-に開発用のローカル設定を用意する) に従います。
 - 取りやめ: 上書きした項目を削除すると標準の運用に戻ります。`.worktreeinclude` を削除します。
 
-#### 7. コミット前セキュリティチェック
+#### 7. コミット前チェック
 
-Git Hook でステージ済みの内容を検査し、問題があればコミットを止めます。Hook は clone ごとの導入、採用の宣言は Git 管理する共有設定です。
+Git Hook でステージ済みの内容を検査し、問題があればコミットを止めます。Git Hook は clone ごとの導入、採用の宣言は Git 管理する共有設定です。
 
 - 状態: `python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .` の結果と、`.hq/v2/settings.json` の `commitSecurity.required`。`<HQ_ROOT>` は HQ Plugin のルートです。
-- 導入: `install` を実行します。繰り返し実行でき、導入済みなら変更しません。既存の Hook や `core.hooksPath` がある場合は [コミット前のセキュリティチェック](#コミット前のセキュリティチェック) の手順で組み込みます。リポジトリとして使い続ける場合は [採用を宣言](docs/commit-security.md#採用を宣言する) します。
-- 変更: `update-available` なら `update` を実行します。その他の状態は [状態表示](docs/commit-security.md#更新解除と状態表示) を確認します。
+- 導入: `install` を実行します。繰り返し実行でき、導入済みなら変更しません。既存の Git Hook や `core.hooksPath` がある場合は [コミット前チェック](#コミット前チェック) の手順で組み込みます。リポジトリとして使い続ける場合は [採用を宣言](docs/references/commit-security.md#採用を宣言する) します。
+- 変更: `update-available` なら `update` を実行します。その他の状態は [状態表示](docs/references/commit-security.md#更新解除と状態表示) を確認します。
 - 取りやめ: `uninstall` を実行します。繰り返し実行でき、未導入なら変更しません。採用の宣言も削除するか `false` にします。
 
 #### 8. AI レビューへの自動対応
 
-AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と再確認を行います。`.hq/v2/pr-feedback.json` で有効化したリポジトリだけで動作します。
+AI レビュアーの指摘を Plugin Hook で待ち、修正・返信・Resolve と再確認を行います。`.hq/v2/pr-feedback.json` で有効化したリポジトリだけで動作します。
 
-- 状態: `.hq/v2/pr-feedback.json` の有無と `enabled`。`gh` の認証や `origin` などの前提。HQ の Hook が読み込まれているか（Codex では信頼済みか）は、利用者に `/hooks` で確認してもらいます。
+- 状態: `.hq/v2/pr-feedback.json` の有無と `enabled`。`gh` の認証や `origin` などの前提。HQ の Plugin Hook が読み込まれているか（Codex では信頼済みか）は、利用者に `/hooks` で確認してもらいます。
 - 導入: [AI レビューへの自動対応](#ai-レビューへの自動対応) の手順に従います。修正・push・返信・Resolve の許可範囲は利用者に個別に確認します。
 - 取りやめ: `enabled: false` にします。監視中の PR があれば停止します。
 
@@ -244,15 +244,15 @@ docs/ の大枠が変わる場合は相談・合意して更新します。大�
 
 ## AI レビューへの自動対応
 
-`pr-feedback` は AI Reviewer の指摘をまとめて受け取り、必要な修正・検証・commit/push、理由付き返信、適切な Resolve と再確認を最大3回行います。**HQ のインストールと、利用先リポジトリでの有効化の両方が必要です。** 待機中はスクリプトだけを動かし、セッション終了後の常駐監視は行いません。
+`pr-feedback` は AI レビュアーの指摘をまとめて受け取り、必要な修正・検証・commit/push、理由付き返信、適切な Resolve と再確認を最大3回行います。**HQ のインストールと、利用先プロジェクトでの有効化の両方が必要です。** 待機中はスクリプトだけを動かし、セッション終了後の常駐監視は行いません。
 
-以下の `<HQ_ROOT>` は `pr-feedback` を含む HQ の取得先、`<TARGET_REPO>` は利用先リポジトリの絶対パスへ置き換えます。すでに HQ を導入済みの場合も、この機能を含む版が読み込まれていることを確認してください。
+以下の `<HQ_ROOT>` は `pr-feedback` を含む HQ の取得先、`<TARGET_REPO>` は利用先プロジェクトの絶対パスへ置き換えます。すでに HQ を導入済みの場合も、この機能を含む版が読み込まれていることを確認してください。
 
 ### 1. 利用先の前提を確認する（共通）
 
-- macOS または Linux で、Python 3.10 以上・Git・GitHub CLI (`gh`) を利用できること。エージェントと Hook の実行環境からも、これらのコマンドと認証情報を利用できる必要があります。
+- macOS または Linux で、Python 3.10 以上・Git・GitHub CLI (`gh`) を利用できること。エージェントと Plugin Hook の実行環境からも、これらのコマンドと認証情報を利用できる必要があります。
 - github.com のリポジトリで、`origin` がそのリポジトリを指していること。初版は同じリポジトリ内のブランチを対象とし、fork PR・GitHub Enterprise は対象外です。
-- Copilot や自前の AI Reviewer が、PR 作成後・必要なら修正 push 後に起動する設定になっていること。**HQ は AI Reviewer 自体の設定・起動を行いません。**
+- Copilot や自前の AI レビュアー が、PR 作成後・必要なら修正 push 後に起動する設定になっていること。**HQ は AI レビュアー 自体の設定・起動を行いません。**
 
 利用先のルートで確認します。未認証なら `gh auth login --hostname github.com` を行い、対象 PR の読み取り・返信・Resolve とブランチへの push に必要な権限を用意します。
 
@@ -263,7 +263,7 @@ git remote get-url origin
 gh auth status --hostname github.com
 ```
 
-### 2. HQ を読み込む（製品別）
+### 2. HQ を読み込む（ツール別）
 
 #### Codex
 
@@ -275,14 +275,14 @@ codex plugin marketplace add .
 codex plugin add hq@hq-marketplace
 ```
 
-利用先で新しい Codex セッションを開きます。デスクトップの場合も、利用先リポジトリをプロジェクトとして開いて新しいチャットを開始します。
+利用先で新しい Codex セッションを開きます。デスクトップの場合も、利用先プロジェクトをプロジェクトとして開いて新しいチャットを開始します。
 
 ```bash
 cd "<TARGET_REPO>"
 codex
 ```
 
-Codex CLI の `/hooks` で HQ の Hook の内容を確認し、未信頼の定義を信頼します。**Plugin のインストールだけでは Hook は実行されません。** 定義が更新された場合も再確認が必要です。デスクトップで信頼確認を案内された場合は、その案内に従ってください。[公式の Hook 信頼手順](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
+Codex CLI の `/hooks` で HQ の Plugin Hook の内容を確認し、未信頼の定義を信頼します。**Plugin のインストールだけでは Plugin Hook は実行されません。** 定義が更新された場合も再確認が必要です。デスクトップで信頼確認を案内された場合は、その案内に従ってください。[公式の Plugin Hook 信頼手順](https://learn.chatgpt.com/docs/hooks#review-and-trust-hooks)
 
 #### Claude Code
 
@@ -303,11 +303,11 @@ cd "<TARGET_REPO>"
 claude
 ```
 
-`/hooks` で HQ の Hook が読み込まれていることを確認します。利用先の信頼・権限について確認が出た場合は内容を確認してください。すでに永続インストールした HQ がある場合は、一時読み込みと重ねず、使用する版と経路を一つに揃えます。[公式の Plugin 導入手順](https://code.claude.com/docs/en/discover-plugins)
+`/hooks` で HQ の Plugin Hook が読み込まれていることを確認します。利用先の信頼・権限について確認が出た場合は内容を確認してください。すでに永続インストールした HQ がある場合は、一時読み込みと重ねず、使用する版と経路を一つに揃えます。[公式の Plugin 導入手順](https://code.claude.com/docs/en/discover-plugins)
 
 ### 3. 利用先で有効化する（共通）
 
-**利用先リポジトリ**に `.hq/v2/pr-feedback.json` を作成します。すでに存在する場合は内容を確認して編集し、上書きしません。次は Copilot を対象に、修正・push・返信・Resolve を許可する例です。
+**利用先プロジェクト**に `.hq/v2/pr-feedback.json` を作成します。すでに存在する場合は内容を確認して編集し、上書きしません。次は Copilot を対象に、修正・push・返信・Resolve を許可する例です。
 
 ```json
 {
@@ -328,9 +328,9 @@ claude
 
 `repository` は利用先の `OWNER/REPOSITORY` に置き換えます。`reviewers` は GitHub GraphQL API が返す投稿アカウントの `login` です。Copilot は `copilot-pull-request-reviewer` を指定します。末尾の `[bot]` と大文字・小文字の違いは照合時に正規化します。`ignoreReviewBodies` は総評を対応対象から除く login です。省略時は Copilot の総評を除き、個別スレッドとレビュー完了の検出は維持します。本文にも指摘を載せるレビュアーでは除外しないでください。自前レビュアーや複数のレビュアーでは対象の login を配列に指定します。未設定・`enabled: false` のリポジトリでは監視しません。[無効状態の設定例](examples/project/.hq/v2/pr-feedback.json)も参照できます。
 
-`waitAfterPush: true` は push のたびに新しいレビューを待ち、false はその PR の初回レビューだけ待ちます。省略時は true です。従来の文字列指定も引き続き使えます。false のレビュアーから監視中に届いた追加指摘も取得します。複数レビュアーを混在させる例と入力条件は [運用手順](docs/pr-feedback.md) を参照してください。
+`waitAfterPush: true` は push のたびに新しいレビューを待ち、false はその PR の初回レビューだけ待ちます。省略時は true です。従来の文字列指定も引き続き使えます。false のレビュアーから監視中に届いた追加指摘も取得します。複数レビュアーを混在させる例と入力条件は [運用手順](skills/pr-feedback/references/operations.md) を参照してください。
 
-同じチャットで、許可する操作を明示します。次の依頼文は両製品で使えます。
+同じチャットで、許可する操作を明示します。次の依頼文は Codex・Claude Code で使えます。
 
 ```text
 このリポジトリで HQ の pr-feedback を有効にする。
@@ -339,53 +339,53 @@ claude
 判断・対応は最大3回。別 PR 候補は Issue 案まで作成し、起票前に確認して。
 ```
 
-設定は Git 管理してリポジトリで共有できます。報告ファイルの保存先 `.hq/v2/.ignore/` は、既存の `.gitignore` に追加して管理対象外にします。Plugin Hook は Plugin から読み込むため、利用先への Hook ファイルのコピーや Git の `core.hooksPath` 設定は不要です。コミット前セキュリティチェックの導入は別の操作です。
+設定は Git 管理してリポジトリで共有できます。報告ファイルの保存先 `.hq/v2/.ignore/` は、既存の `.gitignore` に追加して管理対象外にします。Plugin Hook は Plugin から読み込むため、利用先への Plugin Hook ファイルのコピーや Git の `core.hooksPath` 設定は不要です。コミット前チェックの導入は別の操作です。
 
 ### 4. PR を作成して監視を開始する
 
-有効化したセッション内で、通常どおり PR を作成します。`gh pr create` など対応する作成経路の完了後に `HQ pr-feedback registered PR #...` の通知が出れば、監視が登録されています。**セッションを開いたまま**にしてください。ターン終了時の Hook がレビューを待ち、FB の対応または終了報告のために処理を継続します。
+有効化したセッション内で、通常どおり PR を作成します。`gh pr create` など対応する作成経路の完了後に `HQ pr-feedback registered PR #...` の通知が出れば、監視が登録されています。**セッションを開いたまま**にしてください。ターン終了時の Plugin Hook がレビューを待ち、フィードバックの対応または終了報告のために処理を継続します。
 
 既存 PR、ブラウザ・別ターミナルで作成した PR、登録通知が出ない経路では、対象のブランチを開いたセッションで明示的に依頼します。
 
-| 製品 | チャットでの依頼例 |
+| ツール | チャットでの依頼例 |
 | --- | --- |
 | Codex | `$pr-feedback を使って PR #123 の監視を登録し、AI レビューの指摘に対応して。` |
 | Claude Code | `/hq:pr-feedback PR #123 の監視を登録し、AI レビューの指摘に対応して。` |
 
-### 停止方法と製品差
+### 停止方法とツール差
 
 | 項目 | Codex | Claude Code |
 | --- | --- | --- |
-| Plugin の呼び出し | `$pr-feedback` | `/hq:pr-feedback` |
-| Hook 定義 | `hooks/codex.json`。定義ごとの信頼確認が必要 | `hooks/hooks.json`。Plugin 読み込み時に登録 |
-| 待機 | 同期 Stop Hook。既定は最大10分、待機中のモデル呼び出しなし | 同左 |
-| 中断 | Interrupt Hook が監視の中断を記録 | 中断後に監視をやめる場合は明示的な停止または無効化が必要 |
+| Skill の呼び出し | `$pr-feedback` | `/hq:pr-feedback` |
+| Plugin Hook 定義 | `hooks/codex.json`。定義ごとの信頼確認が必要 | `hooks/hooks.json`。Plugin 読み込み時に登録 |
+| 待機 | 同期 Stop の Plugin Hook。既定は最大10分、待機中のモデル呼び出しなし | 同左 |
+| 中断 | Interrupt の Plugin Hook が監視の中断を記録 | 中断後に監視をやめる場合は明示的な停止または無効化が必要 |
 | セッション終了 | 監視を停止。終了後の自動処理なし | 同左 |
 
-監視を停止する場合は、チャットで「この PR の pr-feedback の監視を停止して」と依頼します。以後の自動登録も無効にする場合は、利用先の設定を `enabled: false` に変更します。再開・手動コマンド・待機期限と Cap 到達時の扱いは [運用手順](docs/pr-feedback.md) を参照してください。
+監視を停止する場合は、チャットで「この PR の pr-feedback の監視を停止して」と依頼します。以後の自動登録も無効にする場合は、利用先の設定を `enabled: false` に変更します。再開・手動コマンド・待機期限と対応回数の上限到達時の扱いは [運用手順](skills/pr-feedback/references/operations.md) を参照してください。
 
-macOS では Hook の待機中だけアイドルスリープを抑止します。手動スリープや Hook の強制終了などで監視が取り残された場合は、次の状態確認・Hook 実行で中断の疑いを示します。`wait-interrupted` はレビュー未確認を意味し、明示的に再開しても対応回数は保持します。セッション停止中の即時通知は行いません。
+macOS では Plugin Hook の待機中だけアイドルスリープを抑止します。手動スリープや Plugin Hook の強制終了などで監視が取り残された場合は、次の状態確認・Plugin Hook 実行で中断の疑いを示します。`wait-interrupted` はレビュー未確認を意味し、明示的に再開しても対応回数は保持します。セッション停止中の即時通知は行いません。
 
-## コミット前のセキュリティチェック
+## コミット前チェック
 
 ステージ済みファイルの具体的なローカルパス、env 系ファイル、API キー・トークン等と思われる値を検出し、問題があればコミットを止めます。Python 3.10 以上と Git 2.31 以上を使用し、追加の Python パッケージは不要です。
 
 ### チャットで導入を依頼する
 
-コミット前チェックを含む HQ Plugin をインストールした後、**利用先リポジトリ**を開いた新しいチャット・セッションで、次のように依頼します。Codex・Claude Code のどちらでも同じ内容で依頼できます。
+コミット前チェックを含む HQ Plugin をインストールした後、**利用先プロジェクト**を開いた新しいチャット・セッションで、次のように依頼します。Codex・Claude Code のどちらでも同じ内容で依頼できます。
 
 ```text
-HQ の git Skill を使って、このリポジトリにコミット前セキュリティチェックを導入して。
+HQ の git Skill を使って、このリポジトリにコミット前チェックを導入して。
 
-既存の Git Hooks や core.hooksPath は上書きせず、既存の仕組みがあればそこへ組み込んで。
+既存の Git Hook や core.hooksPath は上書きせず、既存の仕組みがあればそこへ組み込んで。
 導入後は状態を確認し、自動チェックが有効になったか、未確認の点があるかを報告して。
 ```
 
-既存 Hook がなければ、検証コードを利用先の Git 管理領域へコピーし、Git Hooks を設置します。状態が `ready` であれば、自動実行する Hook とコピーが揃っています。既存 Hook や `core.hooksPath` がある場合は、自動導入を停止して既存の仕組みへ組み込みます。手動組み込みは状態表示だけでは動作を保証できないため、確認状況も報告させます。整形などの処理をチェックの前に走らせる場合は、HQ の Hook を書き換えず `<Hook 名>.d/`（例: `.git/hooks/pre-commit.d/`）に実行ファイルを置きます。
+既存 Git Hook がなければ、検証コードを利用先の Git 管理領域へコピーし、Git Hook を設置します。状態が `ready` であれば、自動実行する Git Hook とコピーが揃っています。既存 Git Hook や `core.hooksPath` がある場合は、自動導入を停止して既存の仕組みへ組み込みます。手動組み込みは状態表示だけでは動作を保証できないため、確認状況も報告させます。整形などの処理をチェックの前に走らせる場合は、HQ の Git Hook を書き換えず `<Hook 名>.d/`（例: `.git/hooks/pre-commit.d/`）に実行ファイルを置きます。
 
 ### コマンドで導入する
 
-手動の場合は、利用先リポジトリのルートで次を実行します。`<HQ_ROOT>` はインストールした HQ Plugin のルートへ置き換えます。
+手動の場合は、利用先プロジェクトのルートで次を実行します。`<HQ_ROOT>` はインストールした HQ Plugin のルートへ置き換えます。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" install --repo .
@@ -394,7 +394,7 @@ python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 
 `install` と `uninstall` は繰り返し実行でき、導入済み・未導入なら変更しません。導入後は通常のコミットで自動実行します。新しく clone したリポジトリでは再導入が必要です。同じ Git 管理領域を使う worktree では共有します。コピーは Plugin の移動・削除後も残り、更新は明示的に行います。
 
-Plugin のインストールだけでは Git Hook は有効になりません。Codex・Claude Code の `SessionStart` Hook は、導入後の設定切れや更新候補をエージェントへ通知する補助機能です。未導入は、共有設定で[採用を宣言](docs/commit-security.md#採用を宣言する)したリポジトリでだけ通知します。Codex では Hook 定義への信頼も必要です。チェックの前に走らせる処理、既存 Hook への組み込み、更新・解除、検出範囲・例外・制約は [コミット前チェックの詳細](docs/commit-security.md) を参照してください。
+Plugin のインストールだけでは Git Hook は有効になりません。Codex・Claude Code の `SessionStart` の Plugin Hook は、導入後の設定切れや更新候補をエージェントへ通知する補助機能です。未導入は、共有設定で[採用を宣言](docs/references/commit-security.md#採用を宣言する)したリポジトリでだけ通知します。Codex では Plugin Hook 定義への信頼も必要です。チェックの前に走らせる処理、既存 Git Hook への組み込み、更新・解除、検出範囲・例外・制約は [コミット前チェックの詳細](docs/references/commit-security.md) を参照してください。
 
 ## 利用先プロジェクトの設定
 
@@ -411,9 +411,9 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` と `status.json` を標準とし、短い内容は `work.md` に節を分けて統合できます。要求は Goal（何を変えたい・作りたいか）・Context（影響する範囲）・Constraints（守る標準・規約）・Done When（完了とする条件と確認方法）で書きます。`tasks.md` または `work.md` の冒頭に短い概要と詳しい現在地を残します。
 
-`status.json` は状態（`active`・`paused`・`done`）・SSOT への影響（`ssotImpact`）・PR 番号を持ちます。SSOT への影響がある作業は必ず記録を作り、ない作業は必要性から判断します。作業の規模では決めません。SSOT を登録したプロジェクトでは、PR を作る前に SSOT の確認・更新が必要かを確かめます。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/work-records.md)、SSOT の定義と PR 作成時の確認は [SSOT と PR 作成時の確認](docs/ssot.md) にまとめています。
+`status.json` は状態（`active`・`paused`・`done`）・SSOT への影響（`ssotImpact`）・PR 番号を持ちます。SSOT への影響がある作業は必ず記録を作り、ない作業は必要性から判断します。作業の規模では決めません。SSOT を登録したプロジェクトでは、PR を作る前に SSOT の確認・更新が必要かを確かめます。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/references/work-records.md)、SSOT の定義と PR 作成時の確認は [SSOT と PR 作成時の確認](docs/references/ssot.md) にまとめています。
 
-Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
+Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。Codex・Claude Code で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
 利用先の AGENTS.md には適用方針と参照先を残し、検証・PR 省略条件は [.hq/v2/git.md の例](examples/project/.hq/v2/git.md) を既存文書へ統合します。lint・型チェック・クリーンビルド・単体テストなどを一律に必須とせず、プロジェクトごとに適用条件と実在するコマンドを定めます。環境・テスト・配布ツールという分類だけで PR を省略しません。
 
@@ -425,7 +425,7 @@ PR のタイトル・本文の整理と作成・更新は [pr](skills/pr/SKILL.m
 
 完了・取りやめの記録は、継続して必要な内容を関連文書へ反映し、最終の状態を記録します。完了にした PR では削除せず、取り込まれた後の別の変更で削除します。squash merge などでは、同じ PR で作成・更新して削除した記録が取り込み先の履歴に残らないためです。取り込み方法は利用先の運用に任せます。再開を見込む当面の保留は、状態と理由を記録して `wip/` に残します。削除した記録は Git の履歴から参照・復元できます。マージをまたぐ記録は `git log --full-history -- <パス>` で探します。終了時の整理手順は [wip の「検証と完了」](skills/wip/SKILL.md#検証と完了) にまとめています。取り込み後の削除の判断と実施は [sweep](skills/sweep/SKILL.md) が担います。
 
-作業記録はコードや関連文書とともに Git 管理します。本文は現在地と判断理由・検証結果を示し、変更の経緯は Git history に残します。コミットのタイミングと単位はプロジェクトの規約やユーザーの指示に従います。
+作業記録はコードや関連文書とともに Git 管理します。本文は現在地と判断理由・検証結果を示し、変更の経緯は Git history に残します。コミットのタイミングと単位はプロジェクトの規約や利用者の指示に従います。
 
 Gotchas は利用先プロジェクトの `GOTCHAS.md`（`gotchas.path` で変更可）に蓄積し、Skill を跨いで共有します。最初は一つのファイルで扱い、必要に応じて対象領域の見出しで整理します。既存の同等の保存先があれば優先します。
 
@@ -435,7 +435,7 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 
 標準メモリは補助的な想起に任せ、共有する落とし穴の正本はプロジェクト内の記録とします。全文の複製や同期を必須にしません。調査経緯は個別の作業記録、恒久的なルールや正式な手順は AGENTS.md・開発文書に持たせます。Gotchas は合意済みの方針・要求を上書きするものとして扱いません。
 
-アプリの要求・設計・進捗は Plugin に書き込まず、利用先リポジトリに保存します。
+アプリの要求・設計・進捗は Plugin に書き込まず、利用先プロジェクトに保存します。
 特定の技術スタック・パッケージマネージャーを前提にせず、コードや package.json の有無で合意を判断しません。
 
 ### 保存先の設定
@@ -462,7 +462,7 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 - `wip.path`: 作業記録を置くディレクトリ。未指定なら `wip`。
 - `gotchas.path`: Gotchas を記録するファイル。未指定なら `GOTCHAS.md`。
 - `sdd.path`: sdd が文書を作成・維持するディレクトリ。未指定なら `docs`。
-- `ssot.paths`: SSOT として使う文書（ファイルまたはディレクトリ）のリスト。既定値はなく、未指定なら SSOT は未定義で、PR 作成時の SSOT の確認は適用しません。通常は `sdd.path` と同じ場所を登録します。`.`（ルート）は使えません。定義は [SSOT と PR 作成時の確認](docs/ssot.md) にあります。
+- `ssot.paths`: SSOT として使う文書（ファイルまたはディレクトリ）のリスト。既定値はなく、未指定なら SSOT は未定義で、PR 作成時の SSOT の確認は適用しません。通常は `sdd.path` と同じ場所を登録します。`.`（ルート）は使えません。定義は [SSOT と PR 作成時の確認](docs/references/ssot.md) にあります。
 - チームで同じ場所を使うため、checkout 固有の `.hq/v2/.ignore/settings.json` では変更しません。
 - 値が文字列でない、空、絶対パス、`..` を含む場合、各 Skill は標準値に戻さず問題を伝えます。
 - 指定した場所が `.gitignore` などで Git 管理から外れていないか確認します。例えば、トップレベルの `work/` を無視しているリポジトリで `work` を指定すると、記録が共有されません。
@@ -474,7 +474,7 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 
 長期開発系列を維持する worktree と、ベースブランチへ取り込む個別作業用の worktree を区別します。両者は併用でき、長期系列のベースから個別作業を分岐できます。系列用の worktree は保持し、個別作業用は取り込みと利用終了を確認して整理します。セッション単位ではなく作業単位で扱い、今回の作業用に CLI やアプリが既に用意した専用 worktree も再利用します。
 
-標準配置は Git 管理対象外にします。[.gitignore の例](examples/project/.gitignore) を統合し、Git の情報から基準 checkout を確認して配置を固定します。新規作成には指定パスを扱える方法を使い、CLI やアプリ固有の管理先は利用先で指定した場合に使います。以下の製品別手順は、各作成方法を選んだ場合の環境準備を説明しています。
+標準配置は Git 管理対象外にします。[.gitignore の例](examples/project/.gitignore) を統合し、Git の情報から基準 checkout を確認して配置を固定します。新規作成には指定パスを扱える方法を使い、CLI やアプリ固有の管理先は利用先で指定した場合に使います。以下のツール別手順は、各作成方法を選んだ場合の環境準備を説明しています。
 
 ### worktree に開発用のローカル設定を用意する
 
@@ -488,14 +488,14 @@ worktree の環境準備は、利用先プロジェクトで指定した手順�
 
 #### コピー対象を指定する
 
-利用先リポジトリのルートに `.worktreeinclude` を置きます。次は `.env` と `.env.local` が必要な場合の例です。必要な行だけを採用してください。
+利用先プロジェクトのルートに `.worktreeinclude` を置きます。次は `.env` と `.env.local` が必要な場合の例です。必要な行だけを採用してください。
 
 ```gitignore
 .env
 .env.local
 ```
 
-両製品とも `.gitignore` 形式のパターンを使い、一致したファイルのうち Git で除外されているものをコピーします。`.worktreeinclude` にはファイル名だけを記載して共有でき、設定値そのものは Git 管理しません。未追跡ファイル全体や `.hq/v2/.ignore/` 全体を対象にせず、必要な設定ファイルを限定してください。HQ の作業ブランチごとの取り込み先は、コピーした既定値から推測せず、[設定の説明](skills/git/references/settings.md) に従って確認・記録します。
+Codex・Claude Code とも `.gitignore` 形式のパターンを使い、一致したファイルのうち Git で除外されているものをコピーします。`.worktreeinclude` にはファイル名だけを記載して共有でき、設定値そのものは Git 管理しません。未追跡ファイル全体や `.hq/v2/.ignore/` 全体を対象にせず、必要な設定ファイルを限定してください。HQ の作業ブランチごとの取り込み先は、コピーした既定値から推測せず、[設定の説明](skills/git/references/settings.md) に従って確認・記録します。
 
 #### Codex
 
@@ -507,31 +507,31 @@ worktree の環境準備は、利用先プロジェクトで指定した手順�
 
 `claude --worktree`、`EnterWorktree`、デスクトップアプリなどで Claude Code が標準の Git 処理を使って worktree を作成する場合も、同じ `.worktreeinclude` が使えます。コピー後、依存関係の導入や設定の生成は、作成先で利用先のセットアップ手順を実行するか Claude に依頼します。[Claude Code の worktree 公式ドキュメント](https://code.claude.com/docs/en/worktrees#copy-gitignored-files-into-worktrees) を参照してください。
 
-`WorktreeCreate` Hook は作成後の追加処理ではなく、標準の worktree 作成処理全体を置き換えます。ファイルのコピーだけなら `.worktreeinclude` を使います。作成自体を独自管理するために Hook を導入する場合は、作成と必要な設定のコピーをスクリプト内で行い、作成先のパスを返す必要があります。この場合 `.worktreeinclude` は自動処理されません。仕様は [WorktreeCreate の公式ドキュメント](https://code.claude.com/docs/en/hooks#worktreecreate) を参照してください。
+Claude Code の `WorktreeCreate` Hook は作成後の追加処理ではなく、標準の worktree 作成処理全体を置き換えます。ファイルのコピーだけなら `.worktreeinclude` を使います。作成自体を独自管理するために Hook を導入する場合は、作成と必要な設定のコピーをスクリプト内で行い、作成先のパスを返す必要があります。この場合 `.worktreeinclude` は自動処理されません。仕様は [WorktreeCreate の公式ドキュメント](https://code.claude.com/docs/en/hooks#worktreecreate) を参照してください。
 
 #### Git から手動で作成する場合
 
-`git worktree add` 自体は `.worktreeinclude` を処理しないため、作成先で利用先のコピー・セットアップ手順を実行します。自動化には `post-checkout` Hook も使えますが、通常の checkout・switch・clone でも呼ばれ、`--no-checkout` では実行されません。導入する場合は既存 Hook と共存させ、初回作成を判別し、再実行しても既存設定を壊さない処理にします。[Git の Hook 仕様](https://git-scm.com/docs/githooks#_post_checkout) を確認してください。
+`git worktree add` 自体は `.worktreeinclude` を処理しないため、作成先で利用先のコピー・セットアップ手順を実行します。自動化には `post-checkout` Git Hook も使えますが、通常の checkout・switch・clone でも呼ばれ、`--no-checkout` では実行されません。導入する場合は既存 Git Hook と共存させ、初回作成を判別し、再実行しても既存設定を壊さない処理にします。[Git の Git Hook 仕様](https://git-scm.com/docs/githooks#_post_checkout) を確認してください。
 
 ## このリポジトリの開発
 
 ここからは HQ Plugin 自体を開発・保守する方向けの説明です。利用先への導入には、前半の手順を使用してください。
 
-既存の HQ を引き継ぎ、プラグイン名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
+既存の HQ を引き継ぎ、Plugin 名は `hq`、第2世代の開始バージョンは `2.0.0` とします。
 
 Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポートする [CLAUDE.md](CLAUDE.md) から共通ルールを読みます。
 これらはこのリポジトリでの開発用です。Plugin のインストール先へ適用する指示は Skill などの構成要素に持たせます。
 `examples/project/` は利用先プロジェクト向けの例です。
-ローカル開発中の変更を Codex の利用先リポジトリで試す際は、[開発中のコードの反映手順](AGENTS.md#codex-で開発中のコードを利用先に反映する) に従い、Marketplace の再登録・Plugin の再インストールと反映確認を行ってから、新しいチャットで動作を確認します。
+ローカル開発中の変更を Codex の利用先プロジェクトで試す際は、[開発中のコードの反映手順](AGENTS.md#codex-で開発中のコードを利用先に反映する) に従い、Marketplace の再登録・Plugin の再インストールと反映確認を行ってから、新しいチャットで動作を確認します。
 このリポジトリは `develop` から作業ブランチを作り、PR で `develop` へ取り込みます。利用者に影響する変更は [CHANGELOG.md](CHANGELOG.md) の `Unreleased` に含めます。リリース準備の更新も `develop` へ反映し、公開対象とバージョンを確定してからリリース PR で `main` へ取り込み、その検証済みコミットへタグを付けて公開します。詳細は [Git 規約](.hq/v2/git.md)・[リリース規約](.hq/v2/release.md)、設定値は [.hq/v2/settings.json](.hq/v2/settings.json) を参照してください。初回リリースは `2.0.0` とし、開発中の CHANGELOG は `Unreleased` で管理します。
 
 新しい Skill には、開始時の確認事項に利用先の Gotchas を参照する短い案内を記載します。記録・選別・整理の手順は `gotchas` にまとめます。プロジェクト固有の知見は利用先に蓄積し、Skill 自体の問題は共通手順の改善として扱います。
 
-開発専用の [refresh-plugin](.agents/skills/refresh-plugin/SKILL.md) は、Codex の `$refresh-plugin`、Claude Code の `/refresh-plugin` で呼び出せます。`develop` への切り替え、fetch と fast-forward による最新化後、標準では両製品の HQ Plugin を反映します。Codex は再インストールと内容照合、Claude Code はローカル Marketplace の登録・更新と実際の読み込み元の確認を行います。製品を指定した場合は対象を限定します。未コミット変更やローカルの先行・分岐があれば停止します。利用先では更新後に各製品の新しいチャット・セッションを開始してください。
+開発専用の [refresh-plugin](.agents/skills/refresh-plugin/SKILL.md) は、Codex の `$refresh-plugin`、Claude Code の `/refresh-plugin` で呼び出せます。`develop` への切り替え、fetch と fast-forward による最新化後、標準では Codex・Claude Code の HQ Plugin を反映します。Codex は再インストールと内容照合、Claude Code はローカル Marketplace の登録・更新と実際の読み込み元の確認を行います。ツールを指定した場合は対象を限定します。未コミット変更やローカルの先行・分岐があれば停止します。利用先では更新後に各ツールの新しいチャット・セッションを開始してください。
 
-本体は `.agents/skills/refresh-plugin/` に置き、Claude Code は `.claude/skills/refresh-plugin` の相対シンボリックリンクから同じ内容を読みます。Plugin として配布する共通 Skill には含めません。コピー済みの Git コミット前チェックは別途更新が必要です。
+本体は `.agents/skills/refresh-plugin/` に置き、Claude Code は `.claude/skills/refresh-plugin` の相対シンボリックリンクから同じ内容を読みます。Plugin として配布する共通 Skill には含めません。コピー済みのコミット前チェックは別途更新が必要です。
 
-### 作業メモの週次整理（HQ 開発専用・試行）
+### 作業記録の週次整理（HQ 開発専用・試行）
 
 開発専用の [maintenance](.agents/skills/maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) で点検・整理し、続けてローカルの後処理を行います。sweep はローカル以外の環境でも動く本体で、この Skill は手元で実行するときの入口と、develop 向け PR・並行実行の防止・通知などの HQ 固有の条件、手元でしかできない後処理を持ちます。後処理では、整理した記録を未取り込みのまま変更しているローカルの作業を報告し、取り込み済みで利用が終わった worktree・ローカルブランチを一覧にします。手動実行では利用者の確認後に削除し、定期実行では報告だけにします。自動マージと remote のブランチの削除はしません。Codex の `$maintenance`、Claude Code の `/maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回は含めません。
 
@@ -539,7 +539,7 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 タスクには対象 checkout と、次の実行指示を設定します。評価・整理の基準は Skill に集約します。
 
-> HQ checkout の develop に取り込まれた `.agents/skills/maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
+> HQ checkout の develop に取り込まれた `.agents/skills/maintenance/SKILL.md` を読み、その手順で作業記録を点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
 
 Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
@@ -565,7 +565,7 @@ skills/sdd/
   assets/docs/                      全体仕様の雛形
 skills/wip/
   SKILL.md                          作業の具体化・実装・検証・再開
-  assets/wip/                       作業文書と status.json の雛形
+  assets/wip/                       作業記録と status.json の雛形
 skills/sweep/
   SKILL.md                          完了した作業記録の整理と状態の点検
 skills/gotchas/
@@ -580,40 +580,51 @@ skills/release/
   SKILL.md                          CHANGELOG・バージョン・リリース準備・公開
   references/settings.md            リリースの設定と適用例
 skills/pr-feedback/
-  SKILL.md                          AI レビュー指摘への対応・再確認
-hooks/hooks.json                    Claude Code 用 Hook
-hooks/codex.json                    Codex 用 Hook（中断イベントを含む）
+  SKILL.md                          AI レビュアーの指摘への対応・再確認
+hooks/hooks.json                    Claude Code 用 Plugin Hook
+hooks/codex.json                    Codex 用 Plugin Hook（中断イベントを含む）
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
 hooks/ssot_check.py                 作成した PR の SSOT の確認漏れの注意
 hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
-docs/pr-feedback.md                 オプトインと運用・検証
+skills/pr-feedback/references/operations.md                 オプトインと運用・検証
 hooks/git/pre-commit                Git Hook の配布用雛形
 scripts/commit_security.py           コミット対象のセキュリティチェック
 scripts/setup_security.py            Git Hook の導入・更新・状態確認
 scripts/wip.py                       作業記録の一覧・削除判定・PR 作成時の SSOT 確認
-docs/work-records.md                 作業記録の形式・状態・削除の条件
-docs/ssot.md                         SSOT の定義・登録・影響と PR 作成時の確認
-docs/commit-security.md              利用先への導入と検出範囲
+docs/references/work-records.md                 作業記録の形式・状態・削除の条件
+docs/references/ssot.md                         SSOT の定義・登録・影響と PR 作成時の確認
+docs/references/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
 ```
 
-Plugin はリポジトリのルートにあります。両製品から同じ `skills/` を読み込みます。
+Plugin はリポジトリのルートにあります。Codex・Claude Code から同じ `skills/` を読み込みます。
 Codex は `.codex-plugin/` の形式を使用します。ルートのポータブル形式の `plugin.json` は併用しません。
 
 ### 構成要素の追加方針
 
-共通 Skill に加え、対象製品が対応する機能を追加できます。定義や設定が必要になった時にディレクトリ・ファイルを作成します。
+共通 Skill に加え、利用するツールが対応する機能を追加できます。定義や設定が必要になった時にディレクトリ・ファイルを作成します。
 
 | 構成要素 | 配置・扱い |
 | --- | --- |
-| 共通 Skill | `skills/<skill-name>/SKILL.md`。両製品で単独利用できる手順とリソース |
+| 共通 Skill | `skills/<skill-name>/SKILL.md`。Codex・Claude Code で単独利用できる手順とリソース |
 | Claude Code の agent | ルートの `agents/<agent-name>.md`。Claude Code 向けの役割と実行条件 |
-| Hooks | `hooks/` など対象製品の対応する配置。イベント・設定形式の互換性を確認し、必要なら製品別に設定 |
-| MCP サーバー | 対応する設定ファイルと各製品のマニフェスト。共通利用できる部分を共有し、製品固有の接続設定は分離 |
+| Git Hook・Plugin Hook | `hooks/` など利用するツールの対応する配置。イベント・設定形式の互換性を確認し、必要ならツール別に設定 |
+| MCP サーバー | 対応する設定ファイルと各ツールのマニフェスト。共通利用できる部分を共有し、ツール固有の接続設定は分離 |
 
-Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/docs/en/plugins-reference#standard-layout) を使用します。共通 Skill は製品固有の agent や Hooks の存在を前提にせず、製品固有の機能の使い方・対応製品は追加時にここへ記載します。
+Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/docs/en/plugins-reference#standard-layout) を使用します。共通 Skill はツール固有の agent や Plugin Hook の存在を前提にせず、ツール固有の機能の使い方・対応するツールは追加時にここへ記載します。
 `skills/<skill-name>/agents/` に置く Skill の付属メタデータは、ルートの agent 定義とは別のものです。
+
+## HQ 自身の仕様と文書配置
+
+HQ の目的・要求の叩き台は [PRD](docs/ssot/PRD.md)、取り込み先で確認する項目は [実プロジェクト検証チェックリスト](docs/ssot/validation-checklist.md) に置きます。文書構成は合意済みで、PRD 全体の合意と実プロジェクトでの動作確認は未完了です。
+
+- `docs/ssot/`: HQ 自身の PRD・[用語集](docs/ssot/GLOSSARY.md)・実プロジェクト検証チェックリスト。本リポジトリの `sdd.path`・`ssot.paths` はこの場所を指定します。
+- `docs/references/`: 複数 Skill や Hook・スクリプトにまたがる共通規則・利用ガイド。
+- `skills/<name>/references/`: 各 Skill に属する参照資料。
+- `docs/validation.md`: HQ 自体の開発用検証手順。
+
+HQ 自身の要求・制約は PRD、用語の定義・表記は用語集で管理します。配布する sdd Skill の既定の文書構成や、利用先の設定は変更しません。
 
 ## 検証
 
@@ -623,9 +634,9 @@ Claude Code の agent は [標準の `agents/` 配置](https://code.claude.com/d
 python3 scripts/validate.py
 ```
 
-両製品の配布設定、Skill の専用検証と PyYAML の準備、リリース検証、モデルによる動作確認は [検証手順](docs/validation.md) にまとめています。実行する段階と必須条件は [Git 規約](.hq/v2/git.md) を参照してください。
+Codex・Claude Code の配布設定、Skill の専用検証と PyYAML の準備、リリース検証、モデルによる動作確認は [検証手順](docs/validation.md) にまとめています。実行する段階と必須条件は [Git 規約](.hq/v2/git.md) を参照してください。
 
-agent・Hooks・MCP サーバー等を追加・変更した場合は、構造検証に加えて対象製品でその機能を検証します。
+agent・Git Hook・Plugin Hook・MCP サーバー等を追加・変更した場合は、構造検証に加えて利用するツールでその機能を検証します。
 
 ## 公式資料
 

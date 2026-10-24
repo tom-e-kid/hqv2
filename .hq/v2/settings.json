@@ -15,5 +15,13 @@
   },
   "commitSecurity": {
     "required": true
+  },
+  "sdd": {
+    "path": "docs/ssot"
+  },
+  "ssot": {
+    "paths": [
+      "docs/ssot"
+    ]
   }
 }

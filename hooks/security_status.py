@@ -10,7 +10,7 @@ from setup_security import SetupError, locations, status
 
 # Checkout-local settings override the shared ones, as for the other HQ settings.
 SETTINGS = (".hq/v2/.ignore/settings.json", ".hq/v2/settings.json")
-GUIDE = "HQ の git Skill と docs/commit-security.md に導入・更新・解除の手順があります。Plugin の読み込みだけでは Git Hook を有効化しません。"
+GUIDE = "HQ の git Skill と docs/references/commit-security.md に導入・更新・解除の手順があります。Plugin の読み込みだけでは Git Hook を有効化しません。"
 
 
 def required(root):

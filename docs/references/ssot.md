@@ -67,7 +67,7 @@ Plugin ルートの `scripts/wip.py check-pr --repo <対象> --base <取り込�
 
 PR を作る前の確認は、pr・git・wip の手順で行います。Codex・Claude Code の Plugin Hook（`PostToolUse`）は、エージェントが `gh pr create` や PR 作成用の MCP ツールで PR を作った後に、作成された PR へ同じ判定を行い、確認漏れを補います。
 
-Hook は、PR を作るコマンドを解析せず、作成された PR を根拠にします。ツールの実行結果から PR の URL を一つ特定し、`gh pr view` で GitHub 上の head・base のコミットを取得して、そのコミットを判定します。作業中の checkout・ブランチと未コミットの変更は判定に含めません。worktree はコミットを共有するため、どの worktree から作った PR も判定できます。
+Plugin Hook は、PR を作るコマンドを解析せず、作成された PR を根拠にします。ツールの実行結果から PR の URL を一つ特定し、`gh pr view` で GitHub 上の head・base のコミットを取得して、そのコミットを判定します。作業中の checkout・ブランチと未コミットの変更は判定に含めません。worktree はコミットを共有するため、どの worktree から作った PR も判定できます。
 
 次の場合は判定せず、未確認であることを伝えます。問題なしとは扱いません。
 
