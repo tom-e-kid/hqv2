@@ -1,6 +1,6 @@
 # コミット前チェックのファイルの種類による扱い
 
-状態: done。実装・テスト・文書・必須検証を完了し、この記録を含む develop 向けの PR で取り込む。
+状態: done。実装・テスト・文書・必須検証を完了し、この記録を含む [PR #29](https://github.com/tom-e-kid/hqv2/pull/29)（develop 向け）で取り込む。
 
 概要: [Issue #27](https://github.com/tom-e-kid/hqv2/issues/27) に対応する。コードの変数名・型名による `secret-assignment` の誤検出を拡張子ごとの値の読み方で減らし、既知の画像・文書・フォントで `unscannable` を出すかを利用先が選べるようにする。例外の管理（[Issue #28](https://github.com/tom-e-kid/hqv2/issues/28)）は別の作業とする。
 
