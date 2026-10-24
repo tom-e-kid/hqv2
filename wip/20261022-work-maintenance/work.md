@@ -1,7 +1,7 @@
 # 作業メモの週次整理を試行する
 
 概要: HQ 開発専用 Skill に作業メモの評価・分類・整理・PR 提出手順を定義し、週次実行で試す。
-状態: Skill の実装・静的検証済み。週次タスクを登録済み。[PR #17](https://github.com/tom-e-kid/hqv2/pull/17) で develop へ取り込み済み。定期実行での実動作は未検証。2026-10-23 の作業（`wip/20261023-wip-lifecycle/`）で、共通 Skill `sweep` を参照する入口に作り直す。
+状態: Skill の実装・静的検証済み。週次タスクを登録済み。[PR #17](https://github.com/tom-e-kid/hqv2/pull/17) で develop へ取り込み済み。定期実行での実動作は未検証。共通 Skill `sweep` を参照する入口への作り直しは、[PR #21](https://github.com/tom-e-kid/hqv2/pull/21)（2026-10-23 取り込み、作業記録 `wip/20261023-wip-lifecycle/`）で行った。
 
 ## 要求と合意
 
@@ -23,7 +23,7 @@
 | --- | --- | --- |
 | 判断基準と HQ 固有の実行条件を持つ Skill が develop に取り込まれる | PR #17 | 充足 |
 | 週次の定期実行で、点検・PR の作成と更新・無変更時に通知しないことが意図どおり動く | 定期実行の結果と作成された PR | 未確認 |
-| 共通 Skill `sweep` を参照する入口に作り直す（2026-10-23 追加） | [作業記録のライフサイクル管理](../20261023-wip-lifecycle/tasks.md) の PR | 対応中（PR #21） |
+| 共通 Skill `sweep` を参照する入口に作り直す（2026-10-23 追加） | [作業記録のライフサイクル管理](../20261023-wip-lifecycle/tasks.md) の PR | 充足。PR #21 で取り込み済み。`.agents/skills/work-maintenance/SKILL.md` が `sweep` を参照する |
 
 ## 設計とタスク
 
@@ -35,7 +35,7 @@
 - [x] 毎週日曜 3:00（Asia/Tokyo）のタスクを登録する。
 - [ ] 最初の数回の PR で誤分類・整理漏れ・通知頻度を評価する。
 
-作業ブランチ: `feat/work-maintenance`。取り込み先: `origin/develop`。worktree は主 checkout 配下の `.hq/v2/.ignore/worktrees/work-maintenance/`。
+作業ブランチ: `feat/work-maintenance`。取り込み先: `origin/develop`。worktree は主 checkout 配下の `.hq/v2/.ignore/worktrees/work-maintenance/` に作成し、取り込み後に削除済み。
 
 開発専用のため、Plugin のマニフェスト・共通 Skill・CHANGELOG は変更しない。配布する利用者向け動作の変更は含まない。
 

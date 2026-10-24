@@ -16,7 +16,7 @@
 
 ## Context
 
-- 作業記録: `skills/wip/SKILL.md`、雛形 `skills/wip/assets/wip/`、保存先の設定 `wip.path`。このリポジトリの既存記録 `wip/20261018-pr-feedback/`、`wip/20261022-work-maintenance/`、`wip/20261022-worktree-default-policy/`。
+- 作業記録: `skills/wip/SKILL.md`、雛形 `skills/wip/assets/wip/`、保存先の設定 `wip.path`。このリポジトリの既存記録 `wip/20261018-pr-feedback/`、`wip/20261022-work-maintenance/`、[`wip/20261022-worktree-default-policy/`](https://github.com/tom-e-kid/hqv2/tree/190254d0bdca28de285712f29ce58ec303050060/wip/20261022-worktree-default-policy)（完了後に削除済み）。
 - 整理: 開発専用の `.agents/skills/work-maintenance/SKILL.md` と週次の定期タスク。
 - SSOT: sdd が作成・維持する文書（`skills/sdd/`）。共有の定義は新設する `docs/ssot.md`、登録は共有設定の `ssot.paths`。
 - PR 作成: `skills/pr/SKILL.md`、Plugin Hook `hooks/hooks.json`（Claude Code）・`hooks/codex.json`（Codex）、PR 作成を検出する既存の `hooks/pr_feedback.py`。
