@@ -41,6 +41,7 @@ def target(repository, base, head):
 def shell_tokens(command):
     lexer = shlex.shlex(command, posix=True, punctuation_chars=';&|<>()')
     lexer.whitespace_split = True
+    lexer.commenters = ''  # Preserve # inside branch names; trailing comments are unsupported input.
     return list(lexer)
 
 

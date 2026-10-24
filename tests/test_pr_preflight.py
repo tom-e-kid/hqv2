@@ -34,7 +34,7 @@ class PreflightTests(unittest.TestCase):
         gh.write_text('''#!/usr/bin/env python3
 import json, os, sys
 if os.environ.get('GH_FAIL'): sys.exit(1)
-with open(os.environ['GH_LOG'], 'a') as log: log.write('called\\n')
+with open(os.environ['GH_LOG'], 'a') as log: log.write(sys.argv[-1] + '\\n')
 ref = sys.argv[-1]
 print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop') else 'HEAD_SHA']}}))
 ''')
@@ -236,6 +236,7 @@ print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop'
                 else:
                     self.write('.hq/v2/settings.json', settings)
                 self.assertIsNone(self.run_hook('gh pr create --fill', GH_FAIL='1'))
+                self.assertIsNone(self.run_hook('gh pr create --repo owner/repo --base develop --head feat'))
                 self.assertIsNone(self.run_hook(event={'tool_name': 'mcp__github__create_pull_request',
                     'tool_input': {'owner': 'elsewhere', 'repo': 'project', 'base': 'main', 'head': 'topic'}}))
                 self.assertFalse(Path(self.env['GH_LOG']).exists())
@@ -302,3 +303,27 @@ print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop'
     def test_invalid_explicit_switch_is_not_silently_enabled(self):
         self.write('.hq/v2/settings.json', {'wip': {'prPreflight': 'true'}})
         self.assertIn('wip.prPreflight', self.denied(self.run_hook('gh pr create --fill')))
+
+    def test_disabled_scope_never_reaches_api_for_a_resolvable_target(self):
+        self.record()
+        self.write('.hq/v2/settings.json', {'wip': {'path': 'wip', 'prPreflight': False}})
+        # Deliberately test the absence of API effects independently of the hook's decision.
+        self.run_hook('gh pr create --repo owner/repo --base develop --head feat')
+        self.assertFalse(Path(self.env['GH_LOG']).exists(), 'disabled scope reached the GitHub API')
+
+    def test_enabled_scope_logs_api_for_the_same_resolvable_target(self):
+        self.record()
+        self.run_hook('gh pr create --repo owner/repo --base develop --head feat')
+        self.assertIn('repos/owner/repo/git/ref/heads/feat', Path(self.env['GH_LOG']).read_text())
+
+    def test_hash_inside_branch_name_is_not_a_comment(self):
+        self.record('done')
+        self.assertIsNone(self.run_hook('gh pr create -R owner/repo -B develop -H fix#12 --body test'))
+        requests = Path(self.env['GH_LOG']).read_text().splitlines()
+        self.assertIn('repos/owner/repo/git/ref/heads/fix%2312', requests)
+        self.assertNotIn('repos/owner/repo/git/ref/heads/fix', requests)
+
+    def test_trailing_shell_comment_is_rejected_without_target_guessing(self):
+        self.record('done')
+        self.denied(self.run_hook('gh pr create -R owner/repo -B develop -H feat # comment'))
+        self.assertFalse(Path(self.env['GH_LOG']).exists())
