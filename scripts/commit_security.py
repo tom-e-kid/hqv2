@@ -2,7 +2,7 @@
 """Check staged files for local paths, environment files and likely credentials."""
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import hashlib
 import json
 import os
@@ -44,6 +44,32 @@ PLACEHOLDER = re.compile(
     r"(?:your|example|dummy|test|replace|placeholder)(?:[-_ ].*)?|"
     r"change[-_]?me|replace[-_]?me|none|null|true|false|[x*]+)"
 )
+# How secret-assignment reads values: "config" keeps bare values as literals; the others are code,
+# where only quoted values are literals and a double-quoted value with interpolation is an expression.
+# An odd run of backslashes escapes the next character, so only an even run may precede interpolation.
+UNESCAPED = r"(?<!\\)(?:\\\\)*"
+INTERPOLATION = {
+    "config": None,
+    "quoted": None,
+    "swift": re.compile(UNESCAPED + r"\\\("),
+    "kotlin": re.compile(UNESCAPED + r"\$(?:\{|[A-Za-z_])"),
+    "ruby": re.compile(UNESCAPED + r"#\{"),
+}
+FILE_TYPES = {
+    **dict.fromkeys((
+        ".py", ".pyi", ".java", ".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".m", ".mm", ".go", ".rs", ".cs", ".scala",
+        # JavaScript interpolates only in backtick strings, which are not read as quoted values.
+        ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+    ), "quoted"),
+    ".swift": "swift",
+    **dict.fromkeys((".kt", ".kts", ".dart", ".groovy", ".gradle", ".php"), "kotlin"),
+    ".rb": "ruby",
+}
+# Images, documents and fonts whose unscannable finding a repository may turn off.
+BINARY_TYPES = dict.fromkeys((
+    ".png", ".jpg", ".jpeg", ".gif", ".webp", ".heic", ".heif", ".bmp", ".tif", ".tiff", ".ico", ".icns",
+    ".pdf", ".ttf", ".otf", ".ttc", ".woff", ".woff2",
+), True)
 
 
 class CheckError(Exception):
@@ -58,8 +84,23 @@ class Finding:
     fingerprint: str
 
 
+@dataclass(frozen=True)
+class Policy:
+    allow: tuple = ()
+    file_types: dict = field(default_factory=lambda: FILE_TYPES)
+    binaries: bool = True
+    binary_types: dict = field(default_factory=lambda: BINARY_TYPES)
+
+
 def digest(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def file_type(path, types):
+    """Return the value of the longest key that ends the file name, compared case-insensitively."""
+    name = path.rsplit("/", 1)[-1].lower()
+    matches = [key for key in types if name.endswith(key)]
+    return types[max(matches, key=len)] if matches else None
 
 
 class Repository:
@@ -98,32 +139,66 @@ class Repository:
         return self.git("cat-file", "blob", oid)
 
 
+def file_type_overrides(defaults, overrides, valid):
+    """Merge per-extension overrides; keys are file-name suffixes such as ".swift" or ".gradle.kts"."""
+    if not isinstance(overrides, dict):
+        raise ValueError
+    merged = dict(defaults)
+    seen = set()
+    for key, value in overrides.items():
+        key = key.lower()
+        if key in seen or not re.fullmatch(r"(?:\.[a-z0-9][a-z0-9_+-]*)+", key) or not valid(value):
+            raise ValueError
+        seen.add(key)
+        merged[key] = value
+    return merged
+
+
+def parse_policy(policy):
+    if not isinstance(policy, dict) or not {"version", "allow"} <= set(policy) <= {"version", "allow", "rules"}:
+        raise ValueError
+    if type(policy["version"]) is not int or policy["version"] != 1 or not isinstance(policy["allow"], list):
+        raise ValueError
+    for entry in policy["allow"]:
+        if not isinstance(entry, dict) or set(entry) != {"path", "rule", "fingerprint", "reason"}:
+            raise ValueError
+        if not all(isinstance(value, str) and value.strip() for value in entry.values()):
+            raise ValueError
+        path = entry["path"]
+        if path.startswith("/") or "\\" in path or any(part in {"", ".", ".."} for part in path.split("/")):
+            raise ValueError
+        if entry["rule"] not in RULES or not re.fullmatch(r"(?:sha256:[a-f0-9]{64}|blob:[a-f0-9]{40}|blob:[a-f0-9]{64})", entry["fingerprint"]):
+            raise ValueError
+    rules = policy.get("rules", {})
+    if not isinstance(rules, dict) or not set(rules) <= {"secret-assignment", "unscannable"}:
+        raise ValueError
+    assignment = rules.get("secret-assignment", {})
+    unscannable = rules.get("unscannable", {})
+    if not isinstance(assignment, dict) or not set(assignment) <= {"fileTypes"}:
+        raise ValueError
+    if not isinstance(unscannable, dict) or not set(unscannable) <= {"binaries", "binaryTypes"}:
+        raise ValueError
+    binaries = unscannable.get("binaries", True)
+    if type(binaries) is not bool:
+        raise ValueError
+    file_types = file_type_overrides(FILE_TYPES, assignment.get("fileTypes", {}), lambda value: value in INTERPOLATION)
+    binary_types = file_type_overrides(BINARY_TYPES, unscannable.get("binaryTypes", {}), lambda value: type(value) is bool)
+    return Policy(tuple(policy["allow"]), file_types, binaries, binary_types)
+
+
 def load_policy(repo, entries):
     if POLICY_PATH not in entries:
-        return []
+        return Policy()
     mode, oid = entries[POLICY_PATH]
     if mode not in {"100644", "100755"}:
         raise CheckError("Security policy must be a regular staged file")
     try:
         data = repo.blob(oid, 1024 * 1024)
-        policy = json.loads(data) if data is not None else None
-        if not isinstance(policy, dict) or set(policy) != {"version", "allow"} or type(policy["version"]) is not int or policy["version"] != 1:
+        if data is None:
             raise ValueError
-        if not isinstance(policy["allow"], list):
-            raise ValueError
-        for entry in policy["allow"]:
-            if not isinstance(entry, dict) or set(entry) != {"path", "rule", "fingerprint", "reason"}:
-                raise ValueError
-            if not all(isinstance(value, str) and value.strip() for value in entry.values()):
-                raise ValueError
-            path = entry["path"]
-            if path.startswith("/") or "\\" in path or any(part in {"", ".", ".."} for part in path.split("/")):
-                raise ValueError
-            if entry["rule"] not in RULES or not re.fullmatch(r"(?:sha256:[a-f0-9]{64}|blob:[a-f0-9]{40}|blob:[a-f0-9]{64})", entry["fingerprint"]):
-                raise ValueError
-        return policy["allow"]
+        return parse_policy(json.loads(data))
     except (ValueError, TypeError, UnicodeError):
-        raise CheckError("Invalid staged security policy; expected version 1 with explicit, reasoned exceptions") from None
+        raise CheckError("Invalid staged security policy; expected version 1 with explicit, reasoned exceptions and known rule settings") from None
 
 
 def environment_file(path):
@@ -133,21 +208,27 @@ def environment_file(path):
     return bool(re.search(r"(?:^\.env(?:\.|$)|\.env(?:\.|$)|^\.envrc(?:\.|$))", name))
 
 
-def concrete_assignment(line):
+def concrete_assignment(line, style="config"):
+    interpolation = INTERPOLATION[style]
     for match in ASSIGNMENT.finditer(line):
         raw = match[1]
         quoted = raw[:1] in {"'", '"'}
         value = raw[1:-1] if quoted else raw
         if len(value) < 8 or PLACEHOLDER.fullmatch(value):
             continue
+        if style != "config":
+            # In code, bare values are variables or types, and interpolation makes a string an expression.
+            # Single quotes never interpolate here; Dart's single-quoted interpolation stays concrete (safe side).
+            if not quoted or (raw[0] == '"' and interpolation and interpolation.search(value)):
+                continue
         # Unquoted program expressions and variable references are not literal secrets.
-        if not quoted and (not re.fullmatch(r"[A-Za-z0-9_+/=:-]+", value) or re.fullmatch(r"[A-Z_][A-Z0-9_]*", value)):
+        elif not quoted and (not re.fullmatch(r"[A-Za-z0-9_+/=:-]+", value) or re.fullmatch(r"[A-Z_][A-Z0-9_]*", value)):
             continue
         return True
     return False
 
 
-def inspect_file(path, mode, oid, content):
+def inspect_file(path, mode, oid, content, policy=Policy()):
     findings = []
     if environment_file(path):
         findings.append(Finding(path, "env-file", 0, "blob:" + oid))
@@ -161,13 +242,15 @@ def inspect_file(path, mode, oid, content):
     except UnicodeError:
         # Still detect recognizable credentials in the printable parts of a binary.
         text = content.decode("utf-8", errors="replace")
-        findings.append(Finding(path, "unscannable", 0, "blob:" + oid))
+        if policy.binaries or not file_type(path, policy.binary_types):
+            findings.append(Finding(path, "unscannable", 0, "blob:" + oid))
+    style = file_type(path, policy.file_types) or "config"
     for number, line in enumerate(text.splitlines(), 1):
         fingerprint = "sha256:" + digest(line.encode("utf-8"))
         for rule, pattern in (("local-path", LOCAL_PATH), ("private-key", PRIVATE_KEY), ("service-token", SERVICE_TOKEN)):
             if pattern.search(line):
                 findings.append(Finding(path, rule, number, fingerprint))
-        if concrete_assignment(line):
+        if concrete_assignment(line, style):
             findings.append(Finding(path, "secret-assignment", number, fingerprint))
     return findings
 
@@ -186,8 +269,8 @@ def check(cwd, fingerprints=False):
             raise CheckError("Staged entry missing; security check incomplete")
         mode, oid = entries[path]
         content = None if mode == "160000" else repo.blob(oid)
-        for finding in inspect_file(path, mode, oid, content):
-            if any(entry["path"] == path and entry["rule"] == finding.rule and entry["fingerprint"] == finding.fingerprint for entry in policy):
+        for finding in inspect_file(path, mode, oid, content, policy):
+            if any(entry["path"] == path and entry["rule"] == finding.rule and entry["fingerprint"] == finding.fingerprint for entry in policy.allow):
                 accepted += 1
             else:
                 found.append(finding)
