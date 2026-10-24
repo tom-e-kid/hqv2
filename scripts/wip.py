@@ -195,8 +195,9 @@ def check_pr(root, base, head="HEAD"):
                                    "detail": "Registered SSOT paths are not in the head commit: " + ", ".join(missing)})
         if len(missing) == len(ssot):
             return result
-    # The merge base keeps unrelated base updates out, as in the pull request.
-    diff = git(root, "diff", "--name-only", "-z", f"{base}...{head}")
+    # The merge base keeps unrelated base updates out, as in the pull request. Without rename detection a move
+    # lists both paths, so moving a document out of the SSOT still counts as an SSOT change.
+    diff = git(root, "diff", "--name-only", "--no-renames", "-z", f"{base}...{head}")
     if diff.returncode:
         raise WipError("Changed files could not be listed")
     paths = [path for path in diff.stdout.split("\0") if path and not under(path, records_dir)]

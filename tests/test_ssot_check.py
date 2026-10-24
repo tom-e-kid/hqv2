@@ -154,12 +154,27 @@ class SotCheckHookTests(unittest.TestCase):
 
     def test_same_commits_in_another_repository_are_not_checked(self):
         head = self.diverging_branch()
-        clone = Path(self.tmp.name) / "clone"
-        self.git("clone", "-q", str(self.repo), str(clone))
-        self.git("remote", "set-url", "origin", "https://github.com/someone/fork.git", cwd=clone)
-        message = self.run_hook(self.created(), cwd=clone, gh=(head, self.base))
-        self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
-        self.assertIn("no remote for the pull request's repository", message)
+        # Another owner, the same owner/repo on another host, and an SSH host alias are not the PR's repository.
+        for name, url in (("fork", "https://github.com/someone/fork.git"),
+                          ("other-host", "https://github.example.invalid/owner/repo.git"),
+                          ("alias", "git@github-work:owner/repo.git")):
+            with self.subTest(name):
+                clone = Path(self.tmp.name) / "clones" / name
+                self.git("clone", "-q", str(self.repo), str(clone))
+                self.git("remote", "set-url", "origin", url, cwd=clone)
+                message = self.run_hook(self.created(), cwd=clone, gh=(head, self.base))
+                self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
+                self.assertIn("no remote for the pull request's repository", message)
+
+    def test_remote_forms_with_the_same_host_match(self):
+        head = self.diverging_branch()
+        for url in ("https://GitHub.com/owner/repo", "ssh://git@github.com:22/owner/repo.git/"):
+            with self.subTest(url):
+                self.git("remote", "set-url", "origin", url)
+                self.assertIn("ssot-review", self.run_hook(self.created(), gh=(head, self.base)))
+        self.git("remote", "set-url", "origin", "git@ghe.example.com:owner/repo.git")
+        event = self.created("https://ghe.example.com/owner/repo/pull/7\n")
+        self.assertIn("ssot-review", self.run_hook(event, gh=(head, self.base)))
 
     def test_gh_timeout_is_not_checked(self):
         spec = importlib.util.spec_from_file_location("ssot_check_hook", HOOK)

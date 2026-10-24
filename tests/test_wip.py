@@ -244,6 +244,29 @@ class WipTests(unittest.TestCase):
         self.commit("register only missing paths")
         self.assertEqual(self.outcome(), ([], [("ssot-missing", None)]))
 
+    def test_check_pr_counts_both_sides_of_a_move(self):
+        self.define_ssot("docs")
+        self.write("docs/ADD.md", "# ADD\n")
+        self.commit("two SSOT documents")
+        # Moving a document out of the SSOT changes the SSOT, even though Git reports it as a rename.
+        self.git("switch", "-qc", "move-out")
+        self.record("20261001-impact", sot=True)
+        (self.repo / "archive").mkdir()
+        self.git("mv", "docs/PRD.md", "archive/PRD.md")
+        self.commit("move a document out of the SSOT")
+        self.assertTrue(self.check()["ssotChanged"])
+        self.assertEqual(self.outcome(), ([], []))
+        # Moving an implementation file into the SSOT also changes both.
+        self.git("switch", "-qc", "move-in", "develop")
+        self.write("src/notes.md", "# notes\n")
+        self.commit("implementation file")
+        self.git("switch", "-qc", "move-in-pr")
+        self.record("20261001-impact", sot=True)
+        self.git("mv", "src/notes.md", "docs/notes.md")
+        self.commit("move into the SSOT")
+        result = self.check("--head", "move-in-pr", "--base", "move-in")
+        self.assertEqual((result["ssotChanged"], result["implementationChanged"]), (True, True))
+
     def test_check_pr_reads_settings_from_the_head_commit(self):
         self.write(".hq/v2/settings.json", {"ssot": {"paths": ["spec", "README.md"]}, "wip": {"path": "spec/work"}})
         self.write("spec/PRD.md", "# PRD\n")

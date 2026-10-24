@@ -15,7 +15,7 @@ from pr_event import creation_candidate
 
 GH_TIMEOUT = 20
 PR_URL = re.compile(r"https://([\w.-]+)/([\w.-]+)/([\w.-]+)/pull/(\d+)(?!\d)")
-REMOTE_URL = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?[^/:\s]+(?::\d+)?[:/](.+?)(?:\.git)?/*$", re.I)
+REMOTE_URL = re.compile(r"^(?:[a-z][a-z0-9+.-]*://)?(?:[^@/\s]+@)?([^/:\s]+)(?::\d+)?[:/](.+?)(?:\.git)?/*$", re.I)
 OBJECT_ID = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 
 
@@ -24,9 +24,10 @@ class Unchecked(Exception):
 
 
 def created_pull_request(event):
-    """Return (owner/repo, URL) of the single pull request named in the tool result."""
+    """Return ((host, owner/repo), URL) of the single pull request named in the tool result."""
     output = json.dumps(event.get("tool_response", ""), ensure_ascii=False)
-    found = {(f"{match[2]}/{match[3]}".lower(), f"https://{match[1].lower()}/{match[2]}/{match[3]}/pull/{match[4]}".lower())
+    found = {((match[1].lower(), f"{match[2]}/{match[3]}".lower()),
+              f"https://{match[1].lower()}/{match[2]}/{match[3]}/pull/{match[4]}".lower())
              for match in PR_URL.finditer(output)}
     if len(found) != 1:
         raise Unchecked("the tool result does not name exactly one pull request")
@@ -34,13 +35,15 @@ def created_pull_request(event):
 
 
 def remote_repositories(root):
-    """Return owner/repo of every remote; the same commits may exist in another repository."""
+    """Return (host, owner/repo) of every remote; the same commits may exist in another repository.
+
+    Hosts are compared as written, so an SSH host alias does not match and the PR stays unchecked."""
     found = set()
     for line in wip.git(root, "remote", "-v").stdout.splitlines():
         parts = line.split()
         match = REMOTE_URL.match(parts[1]) if len(parts) > 1 else None
         if match:
-            found.add(match[1].lower())
+            found.add((match[1].lower(), match[2].lower()))
     return found
 
 
