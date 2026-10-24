@@ -212,7 +212,7 @@ AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と�
 
 #### 9. 完了した作業記録の定期整理
 
-完了した作業記録は、取り込み後に [sweep](skills/sweep/SKILL.md) で削除します。手動で依頼するほか、利用環境のスケジューラで定期実行できます。HQ がスケジューラへ自動で登録することはありません。
+完了した作業記録は、取り込み後に [sweep](skills/sweep/SKILL.md) で削除します。手動で依頼するほか、利用環境のスケジューラで定期実行できます。HQ がスケジューラへ自動で登録することはありません。sweep は remote と Git の履歴から分かる事実だけで判断するため、GitHub Actions などのローカル以外の環境でも実行できます。sweep の PR は、ブランチ `chore/sweep`・タイトル `chore: sweep work records`・ラベル `hq:sweep`（なければ作成）の固定の形で、開いている PR があれば更新します。
 
 - 状態: 定期タスクの有無は、利用者に利用環境で確認してもらいます。記録の状態は `python3 "<HQ_ROOT>/scripts/wip.py" list --repo .` で確認できます。
 - 導入: 対象リポジトリと実行指示を定期タスクに登録します。許可する変更（編集・コミット・push・PR）を指示に含めます。次は取り込み先が `develop` の場合の例です。
@@ -533,13 +533,13 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 ### 作業メモの週次整理（HQ 開発専用・試行）
 
-開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) の基準で点検し、完了記録の削除と状態の更新・報告を行います。判断の基準は sweep に一本化し、この Skill は develop 向け PR・並行実行の防止・通知などの HQ 固有の条件だけを持ちます。変更があれば検証して develop 向け PR を作成・更新し、自動マージしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回や、既存 worktree・ブランチの削除は含めません。
+開発専用の [maintenance](.agents/skills/maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) で点検・整理し、続けてローカルの後処理を行います。sweep はローカル以外の環境でも動く本体で、この Skill は手元で実行するときの入口と、develop 向け PR・並行実行の防止・通知などの HQ 固有の条件、手元でしかできない後処理を持ちます。後処理では、整理した記録を未取り込みのまま変更しているローカルの作業を報告し、取り込み済みで利用が終わった worktree・ローカルブランチを一覧にします。手動実行では利用者の確認後に削除し、定期実行では報告だけにします。自動マージと remote のブランチの削除はしません。Codex の `$maintenance`、Claude Code の `/maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回は含めません。
 
 このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。
 
 タスクには対象 checkout と、次の実行指示を設定します。評価・整理の基準は Skill に集約します。
 
-> HQ checkout の develop に取り込まれた `.agents/skills/work-maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
+> HQ checkout の develop に取り込まれた `.agents/skills/maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
 
 Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
