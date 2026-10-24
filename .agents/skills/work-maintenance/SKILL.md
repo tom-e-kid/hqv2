@@ -1,20 +1,20 @@
 ---
 name: work-maintenance
-description: HQ 自体の作業記録を定期点検し、共通 Skill sweep の基準で完了記録の削除と状態の更新・報告を行い、必要な変更を develop 向け PR にする。HQ 開発リポジトリ専用の試行用 Skill。
+description: HQ 自体の作業記録を共通 Skill sweep で点検・整理して develop 向け PR にし、続けて取り込み済みの worktree・ブランチの報告と整理などローカルの後処理を行う。手動実行を基本とし、定期実行にも使える。HQ 開発リポジトリ専用の試行用 Skill。
 ---
 
 # HQ の作業記録を点検・整理する
 
-HQ checkout の作業記録（`.hq/v2/settings.json` の `wip.path`、未指定は `wip/`）を点検する。判定・点検の観点・変更の範囲は、この checkout の共通 Skill [sweep](../../../skills/sweep/SKILL.md) に従う。インストール済みの Plugin ではなく、評価の基準にした develop の内容を読む。この Skill には HQ 固有の実行条件だけを置く。
+HQ checkout の作業記録（`.hq/v2/settings.json` の `wip.path`、未指定は `wip/`）を、共通 Skill [sweep](../../../skills/sweep/SKILL.md) で点検・整理し、その後にローカルの後処理を行う。sweep はローカル以外の環境（GitHub Actions など）でも動く本体で、この Skill は手元で実行するときの入口と、手元でしかできない後処理を持つ。判定・点検の観点・変更の範囲・PR の形は、この checkout の sweep に従う。インストール済みの Plugin ではなく、評価の基準にした develop の内容を読む。
 
-手動でも定期実行でも同じ基準を使う。Plugin 利用先の巡回、既存の worktree・作業ブランチの削除、Issue のクローズ、自動マージは行わない。定期タスクからの実行依頼は、この範囲の編集・コミット・push・PR 作成と更新の許可として扱う。読み取り確認だけの依頼では変更しない。
+手動でも定期実行でも同じ基準を使う。Plugin 利用先の巡回、Issue のクローズ、自動マージ、remote のブランチの削除は行わない。定期タスクからの実行依頼は、sweep の範囲の編集・コミット・push・PR の作成と更新の許可として扱い、ローカルの後処理は報告だけにする。読み取り確認だけの依頼では変更しない。
 
 ## 開始と重複防止
 
 1. CWD の Git ルート・origin が HQ (`tom-e-kid/hqv2`) であることを確認する。[AGENTS.md](../../../AGENTS.md)、[Git 規約](../../../.hq/v2/git.md)、[設定](../../../.hq/v2/settings.json) を読む。Gotchas の記録（`.hq/v2/settings.json` の `gotchas.path`、未指定は `GOTCHAS.md`）または同等の記録があれば関連項目を参照する。
-2. `git worktree list --porcelain`、ブランチ、未コミット変更、進行中の Git 操作と、develop 向けの open PR を確認する。既存の作業記録整理 PR は head 名だけでなく目的・差分でも照合する。人間が閉じた未マージ PR を自動で再作成せず、その理由を確認する。
+2. 未コミット変更と進行中の Git 操作、develop 向けの open PR を確認する。開いている sweep の PR（ラベル `hq:sweep`、ブランチ `chore/sweep`）は、目的・差分でも照合する。人間が閉じた未マージ PR を自動で再作成せず、その理由を確認する。
 3. 同一の点検が並行して走らないよう、基準 checkout の `.hq/v2/.ignore/work-maintenance/lock/` を原子的なディレクトリ作成で取得する。保持者と開始時刻を記録し、終了時に自分のロックだけ解放する。既存ロックは奪わず今回を見送る。中断後に残ったロックは保持者の終了を確認するまで削除しない。
-4. origin を fetch し、最新の `origin/develop` を取り込み先・評価の基準にする。主 checkout のブランチ切り替え・pull・stash は行わない。変更が必要になったら、AGENTS.md の指定配置に develop 系列から専用ブランチ・worktree を準備する。既存の整理 PR があれば対応するブランチ・worktree を再利用する。
+4. origin を fetch し、最新の `origin/develop` を取り込み先・評価の基準にする。主 checkout のブランチ切り替え・pull・stash は行わない。変更が必要になったら、AGENTS.md の指定配置（`.hq/v2/.ignore/worktrees/sweep/`）に develop 系列から `chore/sweep` の worktree を準備する。開いている sweep の PR があれば、対応するブランチ・worktree を再利用する。
 
 別作業や人間の未コミット変更・進行中操作がある checkout は編集せず、強制更新・force-push で解消しない。
 
@@ -28,11 +28,20 @@ sweep の手順で、`origin/develop` を取り込み先として判定し、削
 
 1. 編集直前と push 前に対象の最新状態を再確認する。origin/develop、関連 PR、対象ファイルが評価後に変わっていたら、該当する判断・差分を見直す。並行更新が不明ならその対象を保留する。
 2. Git 規約と [検証手順](../../../docs/validation.md) の必須チェックを実行する。付け替えたリンクと、意図しない削除がないことも確認する。失敗時は commit・push を止め、変更と失敗理由を保持して報告する。
-3. [PR 手順](../../../skills/pr/SKILL.md) に従い、検証済みの変更を commit・push し、develop 向け通常 PR を作成・更新する。作成直前にも既存 PR を確認する。本文は問題と変更後の状態、記録ごとの判定と根拠へのリンク、検証結果、未確認事項を示す。人間の追記やレビューの文脈を保持する。
-4. PR の URL・base/head・本文を確認する。自動マージやレビュー返信・Resolve はこの整理依頼に含めない。次回の再利用に必要な作業ブランチ・worktree を保持する。
+3. sweep の「PR にする」に従い、ブランチ `chore/sweep`・タイトル `chore: sweep work records`・ラベル `hq:sweep` で、検証済みの変更を commit・push し、develop 向け通常 PR を作成・更新する。本文の書式は [PR 手順](../../../skills/pr/SKILL.md) に従い、人間の追記やレビューの文脈を保持する。
+4. PR の URL・base/head・ラベル・本文を確認する。自動マージやレビュー返信・Resolve はこの整理依頼に含めない。PR が開いている間は、その作業ブランチと worktree を保持する。
+
+## ローカルの後処理
+
+sweep の整理を終えた後（PR の作成・更新、または変更なし）に、基準 checkout で次を行う。sweep 本体では扱わない、手元にしかない状態が対象。
+
+1. `git worktree list --porcelain`、ローカルブランチ、各 worktree の未コミット変更と進行中の Git 操作を確認する。
+2. 今回の sweep で削除・変更した記録を、未取り込みのまま変更しているローカルのブランチ・worktree があれば報告する。PR が取り込まれる前に扱いを決める必要がある。
+3. [worktree の標準運用](../../../skills/git/references/worktree.md) の「完了後」に当たる、取り込み済みで未コミット変更がなく、利用が終わった個別作業用の worktree とローカルブランチを一覧にする。手動実行では一覧を示し、利用者の確認を得てから削除する。強制オプションは使わない。定期実行では報告だけにする。
+4. 未取り込みのブランチは、利用者の明示的な指示がある場合だけ削除する。未コミット変更・進行中の操作・利用状況が不明な worktree、他のセッションの作業、長期開発系列用の worktree は残す。Plugin の反映元として登録した worktree は、AGENTS.md の反映手順で登録先を戻してから扱う。
 
 ## 無変更時と通知
 
 ローカルの実行状態を基準 checkout の `.hq/v2/.ignore/work-maintenance/state.json` に保存する。前回確認した develop のコミット、整理 PR、通知済み確認事項とその根拠を記録し、次回は現在の事実を再確認する。状態ファイル自体は Git に含めない。
 
-通知は PR の作成・実質的な更新、新しい確認事項、実行失敗、復旧時に行う。変更も新しい確認事項もなければ通知しない。未解決事項や同じ失敗を毎週繰り返し通知せず、根拠・状況が変わった場合に更新する。初回で比較情報がなければ全記録を評価する。実行できなかった点検を成功として記録しない。
+通知は PR の作成・実質的な更新、新しい確認事項（ローカルの後処理で見つけた整理の候補を含む）、実行失敗、復旧時に行う。変更も新しい確認事項もなければ通知しない。未解決事項や同じ失敗を毎週繰り返し通知せず、根拠・状況が変わった場合に更新する。初回で比較情報がなければ全記録を評価する。実行できなかった点検を成功として記録しない。

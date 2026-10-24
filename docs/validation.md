@@ -87,7 +87,8 @@ done
 | PR 作成前の SSOT 確認 | SSOT が登録されたプロジェクトで、`scripts/wip.py check-pr` が、SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていない変更に注意を出す。SSOT が未登録なら適用しない。注意だけで PR 作成を止めず、SSOT を読んで確認・更新の要否を判断し、結論を PR 本文か利用者への報告で扱う。注意が出ないことを整合の確認として扱わない |
 | PR 作成後の Hook | 両製品の新しいセッションで、エージェントが `gh pr create` で PR を作った後、その PR の head・base のコミットに対する指摘が実行結果とともに届くことを確認する。作業用 worktree から作った PR も判定し、PR とコミットを対応付けられない場合は未確認と伝える。PR の head で SSOT が未登録なら何も出さない |
 | SSOT の登録 | `ssot.paths` に登録した文書だけを SSOT として扱い、`docs/` や AGENTS.md を場所から推測しない。sdd は文書の作成・引き継ぎ時に登録を利用者に確認する。`.` や不正な値は標準値へ戻さず伝える |
-| sweep による整理 | `scripts/wip.py sweepable` が `deletable` と判定した記録だけを、知識の反映と参照の付け替えを確認して削除する。`invalid`・`waiting`・`changed` は残して報告し、経過日数だけで状態を推測しない |
+| sweep による整理 | `scripts/wip.py sweepable` が `deletable` と判定した記録だけを、知識の反映と参照の付け替えを確認して削除する。`invalid`・`waiting`・`changed` は残して報告し、経過日数だけで状態を推測しない。競合は remote の open PR とブランチで確認し、ローカルの worktree を前提にしない |
+| sweep の PR | ブランチ `chore/sweep`・タイトル `chore: sweep work records`・ラベル `hq:sweep` で作り、ラベルがなければ作成する。開いている sweep の PR があれば新しく作らず更新し、取り込み済みのブランチは使わない。利用先の規約の指定を優先する |
 | 保存先の設定 | 作業記録と Gotchas は `.hq/v2/settings.json` の `wip.path`・`gotchas.path` に従い、未指定なら `wip/`・`GOTCHAS.md` を使う。不正な値は標準値へ戻さず伝え、Git 管理外の場所なら記録前に伝える |
 | 作業記録の Git 管理 | 本文から現在地を把握でき、判断理由・結果を残す。変更前の全文は Git history に任せ、関連するコミットに記録の更新・移動・削除も含める |
 | 相談・設計だけの完了 | 実装済みを完了条件にしない |
