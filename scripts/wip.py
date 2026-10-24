@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""List work records, find finished ones safe to delete, and check a change against the SOT."""
+"""List work records, find finished ones safe to delete, and remind to review the SSOT for a change."""
 
 import argparse
 import json
@@ -8,7 +8,7 @@ import subprocess
 import sys
 
 STATUSES = ("active", "paused", "done")
-DEFAULTS = {"wip": "wip", "sdd": "docs"}
+DEFAULTS = {"wip": "wip"}
 
 
 class WipError(Exception):
@@ -26,43 +26,59 @@ def repository_root(cwd):
     return Path(result.stdout.strip())
 
 
-def settings_text(root, revision):
+def settings(root, revision=None):
     """Return the shared settings from the working tree, or from a commit when a revision is given."""
     if revision is not None:
         shown = git(root, "show", f"{revision}:.hq/v2/settings.json")
-        return None if shown.returncode else shown.stdout
-    settings = root / ".hq/v2/settings.json"
-    return settings.read_text(encoding="utf-8") if settings.is_file() else None
+        text = None if shown.returncode else shown.stdout
+    else:
+        path = root / ".hq/v2/settings.json"
+        text = path.read_text(encoding="utf-8") if path.is_file() else None
+    if text is None:
+        return {}
+    try:
+        data = json.loads(text)
+    except ValueError:
+        raise WipError(".hq/v2/settings.json is not valid JSON") from None
+    if not isinstance(data, dict):
+        raise WipError(".hq/v2/settings.json must be an object")
+    return data
 
 
-def setting_path(root, key, revision=None):
-    """Return <key>.path from the shared settings, relative to the repository root."""
-    value = DEFAULTS[key]
-    text = settings_text(root, revision)
-    if text is not None:
-        try:
-            data = json.loads(text)
-        except ValueError:
-            raise WipError(".hq/v2/settings.json is not valid JSON") from None
-        if not isinstance(data, dict):
-            raise WipError(".hq/v2/settings.json must be an object")
-        if key in data:
-            section = data[key]
-            value = section.get("path") if isinstance(section, dict) else None
-            if not isinstance(value, str) or not value or value.strip() != value:
-                raise WipError(f"{key}.path must be a non-empty string")
+def repository_path(value, name):
+    """Return a path relative to the repository root."""
+    if not isinstance(value, str) or not value or value.strip() != value:
+        raise WipError(f"{name} must be a non-empty string")
     path = PurePosixPath(value)
     if path.is_absolute() or ".." in path.parts:
-        raise WipError(f"{key}.path must stay inside the repository")
+        raise WipError(f"{name} must stay inside the repository")
     return path
 
 
 def wip_path(root, revision=None):
-    return setting_path(root, "wip", revision)
+    data = settings(root, revision)
+    if "wip" not in data:
+        return PurePosixPath(DEFAULTS["wip"])
+    section = data["wip"]
+    return repository_path(section.get("path") if isinstance(section, dict) else None, "wip.path")
 
 
-def sdd_path(root, revision=None):
-    return setting_path(root, "sdd", revision)
+def ssot_paths(root, revision=None):
+    """Return the registered SSOT paths, or None when the project defines no SSOT.
+
+    The SSOT is never inferred from locations or file names, so there is no default."""
+    data = settings(root, revision)
+    if "ssot" not in data:
+        return None
+    section = data["ssot"]
+    values = section.get("paths") if isinstance(section, dict) else None
+    if not isinstance(values, list) or not values:
+        raise WipError("ssot.paths must be a non-empty list of paths")
+    paths = [repository_path(value, "each ssot.paths entry") for value in values]
+    # The root would make every implementation change an SSOT change.
+    if PurePosixPath(".") in paths:
+        raise WipError("ssot.paths must not include the repository root")
+    return paths
 
 
 def is_number(value):
@@ -79,12 +95,12 @@ def parse_status(text):
         return None, "status.json must be an object"
     if data.get("status") not in STATUSES:
         return None, "status must be active, paused or done"
-    if not isinstance(data.get("sotImpact"), bool):
-        return None, "sotImpact must be true or false"
+    if not isinstance(data.get("ssotImpact"), bool):
+        return None, "ssotImpact must be true or false"
     prs = data.get("prs", [])
     if not isinstance(prs, list) or not all(is_number(n) and n > 0 for n in prs):
         return None, "prs must be a list of PR numbers"
-    return {"status": data["status"], "sotImpact": data["sotImpact"], "prs": prs}, None
+    return {"status": data["status"], "ssotImpact": data["ssotImpact"], "prs": prs}, None
 
 
 def records(root):
@@ -155,56 +171,55 @@ def under(path, directory):
     return path == prefix or path.startswith(prefix + "/")
 
 
-FINDINGS = {
-    "sot-not-updated": "The record expects an SOT change, but this change updates only the implementation. "
-                       "Check the implementation against the SOT; update the SOT with agreement, align the "
-                       "implementation, or confirm that an earlier change of this work already updated it.",
-    "impact-mismatch": "This change updates the SOT, but no work record in it has sotImpact true, so the work that "
-                       "changes the SOT cannot be confirmed. The change alone does not tell which record is wrong; "
-                       "find the work that changes the SOT and review its record.",
-    "sot-without-record": "This change updates the SOT without a work record in the change. "
-                          "Work that changes the SOT needs a record.",
-}
+REVIEW_SSOT = ("This change updates the implementation but not the SSOT, and its work records say the work may "
+               "affect what the SSOT covers. Check whether the SSOT needs a review or an update, and tell the user "
+               "the conclusion. The SSOT already covering it, an earlier PR having updated it, or not changing the "
+               "decision yet are valid conclusions. This is a reminder, not a consistency check.")
 
 
 def check_pr(root, base, head="HEAD"):
-    """Compare the SOT impact recorded in the change from base to head with what it does to the SOT."""
+    """Remind to review the SSOT when a change with SSOT impact updates the implementation but not the SSOT.
+
+    No reminder does not mean the SSOT and the implementation agree; it only means the condition is not met."""
     base, head = commit(root, base), commit(root, head, "Head")
     # Settings and records come from the head commit, so uncommitted edits never mix in.
-    records_dir, sot_dir = wip_path(root, head), sdd_path(root, head)
+    records_dir, ssot = wip_path(root, head), ssot_paths(root, head)
+    result = {"base": base, "head": head, "ssotPaths": None, "ssotChanged": False, "implementationChanged": False,
+              "records": [], "notices": [], "problems": []}
+    if ssot is None:
+        return result  # No SSOT is defined, so the check does not apply.
+    result["ssotPaths"] = [path.as_posix() for path in ssot]
+    missing = [path.as_posix() for path in ssot if git(root, "cat-file", "-e", f"{head}:{path.as_posix()}").returncode]
+    if missing:
+        result["problems"].append({"code": "ssot-missing", "record": None,
+                                   "detail": "Registered SSOT paths are not in the head commit: " + ", ".join(missing)})
+        if len(missing) == len(ssot):
+            return result
     # The merge base keeps unrelated base updates out, as in the pull request.
     diff = git(root, "diff", "--name-only", "-z", f"{base}...{head}")
     if diff.returncode:
         raise WipError("Changed files could not be listed")
-    paths = [path for path in diff.stdout.split("\0") if path]
-    sot_changed = any(under(path, sot_dir) for path in paths)
-    implementation = any(not under(path, records_dir) and not under(path, sot_dir) for path in paths)
-    names = sorted({PurePosixPath(path).relative_to(records_dir).parts[0] for path in paths
-                    if under(path, records_dir) and len(PurePosixPath(path).relative_to(records_dir).parts) > 1})
-    records, findings = [], []
+    paths = [path for path in diff.stdout.split("\0") if path and not under(path, records_dir)]
+    result["ssotChanged"] = any(under(path, item) for path in paths for item in ssot)
+    result["implementationChanged"] = any(not any(under(path, item) for item in ssot) for path in paths)
+    changed = [path for path in diff.stdout.split("\0") if path and under(path, records_dir)]
+    names = sorted({PurePosixPath(path).relative_to(records_dir).parts[0] for path in changed
+                    if len(PurePosixPath(path).relative_to(records_dir).parts) > 1})
     for name in names:
         path = f"{records_dir.as_posix()}/{name}"
         # Like records(), hidden entries and anything but a directory are not records.
         if name.startswith(".") or git(root, "cat-file", "-t", f"{head}:{path}").stdout.strip() != "tree":
             continue  # Includes a record removed by this change, for example when sweeping finished records.
         shown = git(root, "show", f"{head}:{path}/status.json")
-        if shown.returncode:
-            status, problem = None, "status.json is missing"
-        else:
-            status, problem = parse_status(shown.stdout)
-        records.append({"name": name, "path": path, "status": status, "problem": problem})
-        # The SOT may lead the implementation; only an implementation that moves alone is a divergence risk.
+        status, problem = (None, "status.json is missing") if shown.returncode else parse_status(shown.stdout)
+        result["records"].append({"name": name, "path": path, "status": status, "problem": problem})
         if problem:
-            findings.append({"code": "invalid-status", "record": name, "detail": problem})
-        elif status["sotImpact"] and implementation and not sot_changed:
-            findings.append({"code": "sot-not-updated", "record": name, "detail": FINDINGS["sot-not-updated"]})
-    # Touching a record does not mean its work changed the SOT, so an SOT change is judged for the whole change.
-    if sot_changed and not records:
-        findings.append({"code": "sot-without-record", "record": None, "detail": FINDINGS["sot-without-record"]})
-    elif sot_changed and all(record["status"] and not record["status"]["sotImpact"] for record in records):
-        findings.append({"code": "impact-mismatch", "record": None, "detail": FINDINGS["impact-mismatch"]})
-    return {"base": base, "head": head, "sotPath": sot_dir.as_posix(), "sotChanged": sot_changed,
-            "implementationChanged": implementation, "records": records, "findings": findings}
+            result["problems"].append({"code": "invalid-status", "record": name, "detail": problem})
+    impacting = [record["name"] for record in result["records"] if record["status"] and record["status"]["ssotImpact"]]
+    # Touching a record does not show that its work changed anything here, so the reminder never blames a record.
+    if impacting and result["implementationChanged"] and not result["ssotChanged"]:
+        result["notices"].append({"code": "ssot-review", "records": impacting, "detail": REVIEW_SSOT})
+    return result
 
 
 def show(rows, columns):
@@ -243,12 +258,19 @@ def main():
         print(json.dumps(rows, ensure_ascii=False, indent=2))
         return 0
     if args.action == "check-pr":
-        print(f"SOT ({rows['sotPath']}) changed: {'yes' if rows['sotChanged'] else 'no'}; "
+        if rows["ssotPaths"] is None:
+            print("SSOT: not defined (ssot.paths); the check does not apply")
+            return 0
+        answer = {True: "yes", False: "no"}
+        print(f"SSOT ({', '.join(rows['ssotPaths'])}) changed: {answer[rows['ssotChanged']]}; "
+              f"implementation changed: {answer[rows['implementationChanged']]}; "
               f"work records in the change: {len(rows['records'])}")
-        for finding in rows["findings"]:
-            print(f"{finding['code']}: {finding['record'] or '-'}: {finding['detail']}")
-        if not rows["findings"]:
-            print("no findings")
+        for notice in rows["notices"]:
+            print(f"{notice['code']}: {', '.join(notice['records'])}: {notice['detail']}")
+        for problem in rows["problems"]:
+            print(f"cannot judge: {problem['code']}: {problem['record'] or '-'}: {problem['detail']}")
+        if not rows["notices"] and not rows["problems"]:
+            print("no reminder (this does not confirm that the SSOT and the implementation agree)")
         return 0
     if not rows:
         print("no work records")
@@ -256,11 +278,11 @@ def main():
     table = []
     for row in rows:
         status = row["status"] or {}
-        table.append({"name": row["name"], "status": status.get("status", "-"), "sot": {True: "yes", False: "no"}.get(status.get("sotImpact"), "-"),
+        table.append({"name": row["name"], "status": status.get("status", "-"), "ssot": {True: "yes", False: "no"}.get(status.get("ssotImpact"), "-"),
                       "prs": ",".join(f"#{n}" for n in status.get("prs", [])) or "-",
                       "note": row.get("detail") if args.action == "sweepable" else (row["problem"] or ""),
                       "result": row.get("result", "")})
-    columns = [("NAME", "name"), ("STATUS", "status"), ("SOT", "sot"), ("PRS", "prs")]
+    columns = [("NAME", "name"), ("STATUS", "status"), ("SSOT", "ssot"), ("PRS", "prs")]
     columns += [("RESULT", "result"), ("DETAIL", "note")] if args.action == "sweepable" else [("PROBLEM", "note")]
     show(table, columns)
     return 0

@@ -1,4 +1,4 @@
-"""The SOT check after PR creation is advisory and uses only disposable repositories and a fake gh."""
+"""The SSOT check after PR creation only advises, and uses only disposable repositories and a fake gh."""
 
 import importlib.util
 import json
@@ -12,7 +12,7 @@ import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
-HOOK = ROOT / "hooks/sot_check.py"
+HOOK = ROOT / "hooks/ssot_check.py"
 URL = "https://github.com/owner/repo/pull/7"
 FAKE_GH = """#!/bin/sh
 printf '%s\\n' "$*" >> "$FAKE_GH_LOG"
@@ -24,7 +24,7 @@ printf '%s' "$FAKE_GH_JSON"
 
 class SotCheckHookTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = tempfile.TemporaryDirectory(prefix="hq-sot-hook-")
+        self.tmp = tempfile.TemporaryDirectory(prefix="hq-ssot-hook-")
         base = Path(self.tmp.name)
         self.repo = base / "repo"
         self.repo.mkdir()
@@ -42,8 +42,8 @@ class SotCheckHookTests(unittest.TestCase):
         self.git("config", "commit.gpgsign", "false")
         self.git("remote", "add", "origin", "git@github.com:Owner/repo.git")
         self.write("docs/PRD.md", "# PRD\n")
-        self.write("wip/20260901-earlier/status.json", {"status": "active", "sotImpact": False, "prs": []})
-        self.commit("base with records")
+        self.write(".hq/v2/settings.json", {"ssot": {"paths": ["docs"]}})
+        self.commit("base with a registered SSOT")
         self.base = self.rev("develop")
 
     def tearDown(self):
@@ -67,9 +67,9 @@ class SotCheckHookTests(unittest.TestCase):
         self.git("commit", "-qm", message, cwd=root)
 
     def diverging_branch(self):
-        """Commit an implementation-only change for a record that expects an SOT change; return its commit."""
+        """Commit an implementation-only change for a record with SSOT impact; return its commit."""
         self.git("switch", "-qc", "feat")
-        self.write("wip/20261001-impact/status.json", {"status": "active", "sotImpact": True, "prs": []})
+        self.write("wip/20261001-impact/status.json", {"status": "active", "ssotImpact": True, "prs": []})
         self.write("src/app.py", "change = 1\n")
         self.commit("implementation only")
         return self.rev("HEAD")
@@ -106,27 +106,27 @@ class SotCheckHookTests(unittest.TestCase):
     def test_divergence_in_the_created_pr_is_reported(self):
         head = self.diverging_branch()
         message = self.run_hook(self.created(), gh=(head, self.base))
-        self.assertIn("sot-not-updated", message)
+        self.assertIn("ssot-review", message)
         self.assertIn("20261001-impact", message)
         self.assertIn(URL, message)
         self.assertEqual(self.log.read_text().split(), ["pr", "view", URL, "--json", "headRefOid,baseRefOid"])
         mcp = {"tool_name": "mcp__github__create_pull_request", "tool_input": {"base": "develop", "head": "feat"},
                "tool_response": [{"type": "text", "text": json.dumps({"html_url": URL, "number": 7})}]}
-        self.assertIn("sot-not-updated", self.run_hook(mcp, gh=(head, self.base)))
+        self.assertIn("ssot-review", self.run_hook(mcp, gh=(head, self.base)))
         self.write("docs/PRD.md", "# PRD\nupdated\n")
-        self.commit("sot updated")
+        self.commit("SSOT updated")
         self.assertIsNone(self.run_hook(self.created()))
 
     def test_the_pr_commits_decide_not_the_checkout(self):
         head = self.diverging_branch()
         # Another branch checked out, and an uncommitted setting that would hide the finding.
         self.git("switch", "-qc", "other", "develop")
-        self.write(".hq/v2/settings.json", {"sdd": {"path": "src"}})
-        self.assertIn("sot-not-updated", self.run_hook(self.created(), gh=(head, self.base)))
+        self.write(".hq/v2/settings.json", {"ssot": {"paths": ["src"]}})
+        self.assertIn("ssot-review", self.run_hook(self.created(), gh=(head, self.base)))
         # A separate work tree shares the objects, so the main checkout can check its PR.
         tree = Path(self.tmp.name) / "trees" / "fix"
         self.git("worktree", "add", "-q", "-b", "fix", str(tree), "develop")
-        self.write("wip/20261002-fix/status.json", {"status": "active", "sotImpact": True, "prs": []}, root=tree)
+        self.write("wip/20261002-fix/status.json", {"status": "active", "ssotImpact": True, "prs": []}, root=tree)
         self.write("src/fix.py", "fixed = 1\n", root=tree)
         self.commit("fix implementation", root=tree)
         message = self.run_hook(self.created(), gh=(self.git("rev-parse", "HEAD", cwd=tree).strip(), self.base))
@@ -149,8 +149,8 @@ class SotCheckHookTests(unittest.TestCase):
             with self.subTest(label):
                 message = self.run_hook(event, gh=commits, **env)
                 self.assertIsNotNone(message)
-                self.assertTrue(message.startswith("HQ SOT check not run:"), message)
-                self.assertNotIn("sot-not-updated", message)
+                self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
+                self.assertNotIn("ssot-review", message)
 
     def test_same_commits_in_another_repository_are_not_checked(self):
         head = self.diverging_branch()
@@ -158,11 +158,11 @@ class SotCheckHookTests(unittest.TestCase):
         self.git("clone", "-q", str(self.repo), str(clone))
         self.git("remote", "set-url", "origin", "https://github.com/someone/fork.git", cwd=clone)
         message = self.run_hook(self.created(), cwd=clone, gh=(head, self.base))
-        self.assertTrue(message.startswith("HQ SOT check not run:"), message)
+        self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
         self.assertIn("no remote for the pull request's repository", message)
 
     def test_gh_timeout_is_not_checked(self):
-        spec = importlib.util.spec_from_file_location("sot_check_hook", HOOK)
+        spec = importlib.util.spec_from_file_location("ssot_check_hook", HOOK)
         hook = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(hook)
         self.diverging_branch()
@@ -171,40 +171,48 @@ class SotCheckHookTests(unittest.TestCase):
         with patch.dict(os.environ, {**self.env, "FAKE_GH_SLEEP": "5"}, clear=True), patch.object(hook, "GH_TIMEOUT", 0.5):
             message = hook.handle(event)["hookSpecificOutput"]["additionalContext"]
         self.assertLess(time.monotonic() - started, 4)
-        self.assertTrue(message.startswith("HQ SOT check not run:"), message)
+        self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
         self.assertIn("could not be retrieved", message)
 
-    def test_only_pr_commits_without_records_stay_quiet(self):
-        self.git("rm", "-rq", "wip")
-        self.commit("no records")
+    def test_only_a_pr_without_a_registered_ssot_stays_quiet(self):
+        self.git("rm", "-q", ".hq/v2/settings.json")
+        self.commit("no SSOT")
         self.base = self.rev("develop")
-        self.git("switch", "-qc", "feat")
-        self.write("docs/PRD.md", "# PRD\nchanged\n")
-        self.commit("docs only")
-        self.assertIsNone(self.run_hook(self.created()))
-        # The PR adds the first record while the checkout has none: the checkout is no evidence either way.
+        head = self.diverging_branch()
+        self.assertIsNone(self.run_hook(self.created(), gh=(head, self.base)))
+        self.assertTrue(self.log.exists())
+        # The PR registers the SSOT while the checkout has none: the checkout is no evidence either way.
         self.git("switch", "-qc", "first", "develop")
-        self.write("wip/20261001-first/status.json", {"status": "active", "sotImpact": True, "prs": []})
+        self.write(".hq/v2/settings.json", {"ssot": {"paths": ["docs"]}})
+        self.write("wip/20261001-first/status.json", {"status": "active", "ssotImpact": True, "prs": []})
         self.write("src/app.py", "change = 1\n")
-        self.commit("first record")
+        self.commit("first SSOT registration")
         head = self.rev("HEAD")
         self.git("switch", "-q", "develop")
-        self.assertIn("sot-not-updated", self.run_hook(self.created(), gh=(head, self.base)))
+        self.assertIn("ssot-review", self.run_hook(self.created(), gh=(head, self.base)))
         for env in ({"FAKE_GH_FAIL": "1"}, {"FAKE_GH_JSON": "not json"}):
             message = self.run_hook(self.created(), gh=(head, self.base), **env)
-            self.assertTrue(message.startswith("HQ SOT check not run:"), message)
-        self.assertTrue(self.run_hook(self.created("no URL\n")).startswith("HQ SOT check not run:"))
+            self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
+        self.assertTrue(self.run_hook(self.created("no URL\n")).startswith("HQ SSOT check not run:"))
         plain = Path(self.tmp.name) / "plain"
         plain.mkdir()
         message = self.run_hook(self.created(), cwd=plain)
-        self.assertTrue(message.startswith("HQ SOT check not run:"), message)
+        self.assertTrue(message.startswith("HQ SSOT check not run:"), message)
         self.assertIn("not in a Git repository", message)
 
-    def test_invalid_settings_in_the_pr_are_reported(self):
-        self.diverging_branch()
-        self.write(".hq/v2/settings.json", {"sdd": {"path": "../outside"}})
+    def test_reasons_the_check_cannot_judge_are_reported(self):
+        self.git("switch", "-qc", "feat")
+        self.write("wip/20261001-broken/status.json", "{")
+        self.write("docs/PRD.md", "# PRD\nupdated\n")
+        self.commit("broken record with an SSOT change")
+        message = self.run_hook(self.created())
+        self.assertIn("could not judge, invalid-status (20261001-broken)", message)
+        self.assertNotIn("ssot-review", message)
+        self.write(".hq/v2/settings.json", {"ssot": {"paths": ["../outside"]}})
         self.commit("bad setting")
-        self.assertIn("sdd.path", self.run_hook(self.created()))
+        message = self.run_hook(self.created())
+        self.assertTrue(message.startswith("HQ SSOT check could not run:"), message)
+        self.assertIn("ssot.paths", message)
 
 
 if __name__ == "__main__":

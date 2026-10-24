@@ -18,5 +18,8 @@
   },
   "sdd": {
     "path": "docs"
+  },
+  "ssot": {
+    "paths": ["docs"]
   }
 }

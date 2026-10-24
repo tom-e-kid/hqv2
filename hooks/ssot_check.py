@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""After an agent creates a pull request, advise when it may let the implementation diverge from the SOT."""
+"""After an agent creates a pull request, remind it to review the SSOT when the PR may have skipped that."""
 
 import json
 from pathlib import Path
@@ -58,20 +58,8 @@ def pull_request_commits(root, url):
     return commits
 
 
-def uses_records(root, base, head):
-    """Whether any of the commits keeps work records; an invalid wip.path counts so it is not hidden."""
-    for revision in (base, head):
-        try:
-            path = wip.wip_path(root, revision).as_posix()
-        except wip.WipError:
-            return True
-        if wip.git(root, "cat-file", "-t", f"{revision}:{path}").stdout.strip() == "tree":
-            return True
-    return False
-
-
 def check(event):
-    """Return (URL, result) for the created pull request, None when it keeps no records, or raise Unchecked."""
+    """Return (URL, check result) for the created pull request, or raise Unchecked."""
     repository, url = created_pull_request(event)
     cwd = event.get("cwd")
     try:
@@ -86,9 +74,6 @@ def check(event):
     for revision in (head, base):
         if wip.git(root, "cat-file", "-e", f"{revision}^{{commit}}").returncode:
             raise Unchecked("the pull request's head or base commit is not in this repository; fetch it")
-    # Stay quiet in repositories that do not keep work records.
-    if not uses_records(root, base, head):
-        return None
     return url, wip.check_pr(root, base, head)
 
 
@@ -102,18 +87,21 @@ def handle(event):
     try:
         checked = check(event)
     except Unchecked as error:
-        # Without the PR's commits nothing shows whether it keeps records, so report instead of staying quiet.
-        return context(f"HQ SOT check not run: {error}. Run scripts/wip.py check-pr with --base and --head "
-                       "set to the pull request's commits to check SOT alignment.")
+        # Without the PR's commits nothing shows whether an SSOT is defined, so report instead of staying quiet.
+        return context(f"HQ SSOT check not run: {error}. Run scripts/wip.py check-pr with --base and --head "
+                       "set to the pull request's commits to check whether the SSOT needs a review.")
     except wip.WipError as error:
-        return context(f"HQ SOT check could not run: {error}.")
-    if checked is None or not checked[1]["findings"]:
-        return None
+        return context(f"HQ SSOT check could not run: {error}.")
     url, result = checked
-    lines = [f"- {item['code']} ({item['record'] or 'no record'}): {item['detail']}" for item in result["findings"]]
-    return context(f"HQ SOT check of {url} (base {result['base'][:12]}, head {result['head'][:12]}): the SOT "
-                   f"({result['sotPath']}) and the implementation may diverge. Tell the user, and resolve it "
-                   "in this PR or by agreement.\n" + "\n".join(lines))
+    # Quiet also when no SSOT is defined: the check does not apply there.
+    if not result["notices"] and not result["problems"]:
+        return None
+    lines = [f"HQ SSOT check of {url} (base {result['base'][:12]}, head {result['head'][:12]}, "
+             f"SSOT: {', '.join(result['ssotPaths'])}):"]
+    lines += [f"- {item['code']} (records: {', '.join(item['records'])}): {item['detail']}" for item in result["notices"]]
+    lines += [f"- could not judge, {item['code']} ({item['record'] or 'no record'}): {item['detail']}"
+              for item in result["problems"]]
+    return context("\n".join(lines))
 
 
 def main():
@@ -123,7 +111,7 @@ def main():
             print(json.dumps(result, ensure_ascii=False))
     except Exception:
         # Advisory only: never fail the tool call or print raw hook input.
-        print("HQ SOT check: hook failed; SOT alignment was not checked", file=sys.stderr)
+        print("HQ SSOT check: hook failed; the PR was not checked", file=sys.stderr)
     return 0
 
 

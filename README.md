@@ -122,7 +122,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | 実行するもの | Codex・Claude Code | Git |
 | 対象 | そのセッションでのエージェントの操作 | 人・IDE・エージェントを問わない、そのリポジトリの Git 操作 |
 | 有効になる条件 | Plugin の読み込み。Codex は Hook 定義の信頼も必要 | clone ごとの導入 |
-| HQ での用途 | 状態の通知、作成した PR の SOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
+| HQ での用途 | 状態の通知、作成した PR の SSOT 確認、AI レビュー対応の継続 | 問題のあるコミットの停止 |
 
 開発の流れの中で HQ の Hook が動く箇所です。
 
@@ -132,7 +132,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git | 同上 | 項目 7 の導入 |
-| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットについて、作業記録の SOT への影響と SOT の変更を突き合わせる。乖離のおそれ、または確認できなかったことをモデルへ伝える | PR の作成を検出したとき。PR の base・head に作業記録がなければ何も出さない |
+| PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットを判定する。SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていなければ、SSOT の確認・更新が必要か確かめるようモデルへ伝える。判定できない理由や確認できなかったことも伝える | PR の作成を検出したとき。PR の head で SSOT が未登録なら何も出さない |
 | PR 作成後 | `PostToolUse` | Plugin | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
 | 中断 | `Interrupt` | Plugin（Codex のみ） | 監視の中断を記録 | 監視の登録 |
@@ -227,7 +227,7 @@ AI Reviewer の指摘を Plugin Hook で待ち、修正・返信・Resolve と�
 
 | 場所 | 持つもの |
 | --- | --- |
-| docs/ | プロジェクト全体の判断基準。目的・主要要求・基本設計・方針・制約の SOT |
+| docs/ | sdd が作成・維持する SSOT（正本）の標準の場所。目的・主要要求・基本設計・方針・制約。SSOT として使うには `ssot.paths` に登録する |
 | `wip/YYYYMMDD-<作業名>/` | 取り組んでいる作業と、再開を見込む保留中の作業の要求・設計・タスク、判断と結果。状態は `status.json` に残し、完了した記録は取り込み後に削除する。場所は設定で変更できる |
 | `GOTCHAS.md` | Skill を跨いで共有する、プロジェクトの落とし穴と対処。場所は設定で変更できる |
 | 実装・テスト | 詳細な構造・動作と、その検証 |
@@ -411,7 +411,7 @@ Skill の手順を指示ファイルへ複製する必要はありません。
 
 新しい作業記録は `wip/YYYYMMDD-<作業名>/{requirements,design,tasks}.md` と `status.json` を標準とし、短い内容は `work.md` に節を分けて統合できます。要求は Goal（何を変えたい・作りたいか）・Context（影響する範囲）・Constraints（守る標準・規約）・Done When（完了とする条件と確認方法）で書きます。`tasks.md` または `work.md` の冒頭に短い概要と詳しい現在地を残します。
 
-`status.json` は状態（`active`・`paused`・`done`）・SOT への影響（`sotImpact`）・PR 番号を持ちます。SOT（docs/）の範囲を変える作業は必ず記録を作り、変えない作業は必要性から判断します。作業の規模では決めません。PR を作る前に、記録の判断と SOT の変更を突き合わせ、SOT と実装の食い違いを確かめます。形式・状態の変更・削除の条件・PR 作成前の確認は [作業記録の形式と整理](docs/work-records.md) にまとめています。
+`status.json` は状態（`active`・`paused`・`done`）・SSOT への影響（`ssotImpact`）・PR 番号を持ちます。SSOT への影響がある作業は必ず記録を作り、ない作業は必要性から判断します。作業の規模では決めません。SSOT を登録したプロジェクトでは、PR を作る前に SSOT の確認・更新が必要かを確かめます。形式・状態の変更・削除の条件は [作業記録の形式と整理](docs/work-records.md)、SSOT の定義と PR 作成時の確認は [SSOT と PR 作成時の確認](docs/ssot.md) にまとめています。
 
 Git・GitHub の共通手順は [git](skills/git/SKILL.md) にまとめています。両製品で単独利用でき、wip の記録やブランチとの一対一対応を必須にしません。作業ブランチで変更し、新規ブランチは `feat/add-notifications` のような `<type>/<short-description>` とします。type は Conventional Commits と揃え、作成ツール名の接頭辞は付けません。コミットのタイトルは Conventional Commits の簡潔な一行、取り込みは PR を原則とします。worktree は新規作業ごとに作成し、再開では対応する既存環境を使います。標準配置は基準 checkout の `.hq/v2/.ignore/worktrees/<作業名>/` です。利用先の `AGENTS.md` または参照先の規約で項目ごとに上書きでき、未指定の項目には標準運用を適用します。
 
@@ -440,7 +440,7 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 
 ### 保存先の設定
 
-作業記録・Gotchas・SOT（プロジェクトの大枠の文書）の標準の場所は、ルートの `wip/`・`GOTCHAS.md`・`docs/` です。別の場所にする場合は、Git 管理する共有設定 `.hq/v2/settings.json` に記録します。値はリポジトリのルートからの相対パスで、指定した項目だけが変わります。
+作業記録・Gotchas・sdd の文書の標準の場所は、ルートの `wip/`・`GOTCHAS.md`・`docs/` です。SSOT として使う文書は場所から推測せず、`ssot.paths` に登録します。別の場所にする場合は、Git 管理する共有設定 `.hq/v2/settings.json` に記録します。値はリポジトリのルートからの相対パスで、指定した項目だけが変わります。
 
 ```json
 {
@@ -452,13 +452,17 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
   },
   "sdd": {
     "path": "spec"
+  },
+  "ssot": {
+    "paths": ["spec"]
   }
 }
 ```
 
 - `wip.path`: 作業記録を置くディレクトリ。未指定なら `wip`。
 - `gotchas.path`: Gotchas を記録するファイル。未指定なら `GOTCHAS.md`。
-- `sdd.path`: SOT の文書を置くディレクトリ。未指定なら `docs`。sdd が大枠を記録し、wip と PR 作成前の確認が SOT として参照します。
+- `sdd.path`: sdd が文書を作成・維持するディレクトリ。未指定なら `docs`。
+- `ssot.paths`: SSOT として使う文書（ファイルまたはディレクトリ）のリスト。既定値はなく、未指定なら SSOT は未定義で、PR 作成時の SSOT の確認は適用しません。通常は `sdd.path` と同じ場所を登録します。`.`（ルート）は使えません。定義は [SSOT と PR 作成時の確認](docs/ssot.md) にあります。
 - チームで同じ場所を使うため、checkout 固有の `.hq/v2/.ignore/settings.json` では変更しません。
 - 値が文字列でない、空、絶対パス、`..` を含む場合、各 Skill は標準値に戻さず問題を伝えます。
 - 指定した場所が `.gitignore` などで Git 管理から外れていないか確認します。例えば、トップレベルの `work/` を無視しているリポジトリで `work` を指定すると、記録が共有されません。
@@ -580,15 +584,16 @@ skills/pr-feedback/
 hooks/hooks.json                    Claude Code 用 Hook
 hooks/codex.json                    Codex 用 Hook（中断イベントを含む）
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
-hooks/sot_check.py                  作成した PR の SOT と実装の確認
+hooks/ssot_check.py                 作成した PR の SSOT の確認漏れの注意
 hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
 docs/pr-feedback.md                 オプトインと運用・検証
 hooks/git/pre-commit                Git Hook の配布用雛形
 scripts/commit_security.py           コミット対象のセキュリティチェック
 scripts/setup_security.py            Git Hook の導入・更新・状態確認
-scripts/wip.py                       作業記録の一覧・削除判定・PR 作成前の SOT 確認
-docs/work-records.md                 作業記録の形式・削除の条件・PR 作成前の確認
+scripts/wip.py                       作業記録の一覧・削除判定・PR 作成時の SSOT 確認
+docs/work-records.md                 作業記録の形式・状態・削除の条件
+docs/ssot.md                         SSOT の定義・登録・影響と PR 作成時の確認
 docs/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例
 ```

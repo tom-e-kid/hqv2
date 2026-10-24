@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/sot_check.py\"",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ssot_check.py\"",
             "timeout": 30
           },
           {
