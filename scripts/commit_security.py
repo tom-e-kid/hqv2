@@ -45,20 +45,24 @@ PLACEHOLDER = re.compile(
     r"change[-_]?me|replace[-_]?me|none|null|true|false|[x*]+)"
 )
 # How secret-assignment reads values: "config" keeps bare values as literals; the others are code,
-# where only quoted values are literals and a value containing interpolation is an expression.
+# where only quoted values are literals and a double-quoted value with interpolation is an expression.
+# An odd run of backslashes escapes the next character, so only an even run may precede interpolation.
+UNESCAPED = r"(?<!\\)(?:\\\\)*"
 INTERPOLATION = {
     "config": None,
     "quoted": None,
-    "swift": re.compile(r"\\#*\("),
-    "kotlin": re.compile(r"\$(?:\{|[A-Za-z_])"),
-    "javascript": re.compile(r"\$\{"),
-    "ruby": re.compile(r"#\{"),
+    "swift": re.compile(UNESCAPED + r"\\\("),
+    "kotlin": re.compile(UNESCAPED + r"\$(?:\{|[A-Za-z_])"),
+    "ruby": re.compile(UNESCAPED + r"#\{"),
 }
 FILE_TYPES = {
-    **dict.fromkeys((".py", ".pyi", ".java", ".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".m", ".mm", ".go", ".rs", ".cs", ".scala"), "quoted"),
+    **dict.fromkeys((
+        ".py", ".pyi", ".java", ".c", ".h", ".cc", ".cpp", ".cxx", ".hh", ".hpp", ".m", ".mm", ".go", ".rs", ".cs", ".scala",
+        # JavaScript interpolates only in backtick strings, which are not read as quoted values.
+        ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+    ), "quoted"),
     ".swift": "swift",
     **dict.fromkeys((".kt", ".kts", ".dart", ".groovy", ".gradle", ".php"), "kotlin"),
-    **dict.fromkeys((".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts"), "javascript"),
     ".rb": "ruby",
 }
 # Images, documents and fonts whose unscannable finding a repository may turn off.
@@ -214,7 +218,8 @@ def concrete_assignment(line, style="config"):
             continue
         if style != "config":
             # In code, bare values are variables or types, and interpolation makes a string an expression.
-            if not quoted or (interpolation and interpolation.search(value)):
+            # Single quotes never interpolate here; Dart's single-quoted interpolation stays concrete (safe side).
+            if not quoted or (raw[0] == '"' and interpolation and interpolation.search(value)):
                 continue
         # Unquoted program expressions and variable references are not literal secrets.
         elif not quoted and (not re.fullmatch(r"[A-Za-z0-9_+/=:-]+", value) or re.fullmatch(r"[A-Z_][A-Z0-9_]*", value)):

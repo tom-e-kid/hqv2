@@ -233,16 +233,33 @@ class SecurityTests(unittest.TestCase):
             ("Token.swift", "let token", '"\\(header).\\(payload).signature"'),
             ("Token.kt", "val token", '"$header.$payload.signature"'),
             ("Token.kt", "val idToken", '"${header}.${payload}.signature"'),
-            ("token.ts", "const authorization", '"Bearer ${accessToken}"'),
+            ("Token.kt", "val token", '"prefix-part\\\\$header"'),
+            ("index.php", "$token", '"$header.$payload.signature"'),
+            ("token.dart", "final token", '"$header.$payload.signature"'),
             ("token.rb", "token", '"#{header}.#{payload}.signature"'),
         )
         for name, key, value in expressions:
-            with self.subTest(expression=key, file=name):
+            with self.subTest(expression=value, file=name):
                 self.stage_alone({name: key + " = " + value + "\n"})
                 self.assertEqual(self.check().returncode, 0)
-        # Another language's syntax is literal text, so the value stays concrete.
-        for name, key, value in (("Token.swift", "let token", '"$header.$payload.signature"'), ("token.py", "token", '"\\(header).\\(payload).signature"')):
-            with self.subTest(literal=name):
+        # Interpolation counts only where the language performs it: in double quotes, unescaped,
+        # and with that language's syntax. Dart also interpolates single quotes; those stay concrete.
+        literals = (
+            ("Token.swift", "let token", '"$header.$payload.signature"'),
+            ("Token.swift", "let token", '"ab\\\\(not).real-value"'),
+            ("token.py", "token", '"\\(header).\\(payload).signature"'),
+            ("index.php", "$password", "'Pa$sw0rd-not-real'"),
+            ("index.php", "$password", '"Pa\\$sw0rd-not-real"'),
+            ("Main.kt", "val password", '"Pa\\$sw0rd-not-real"'),
+            ("build.groovy", "def password", "'Pa$sw0rd-not-real'"),
+            ("token.dart", "final token", "'$header.$payload.signature'"),
+            ("app.rb", "password", "'ab#{not-real-value}'"),
+            ("app.rb", "password", '"ab\\#{not-real-value}"'),
+            ("app.js", "const password", "'ab${not-real-value}'"),
+            ("app.ts", "const authorization", '"Bearer ${accessToken}"'),
+        )
+        for name, key, value in literals:
+            with self.subTest(literal=value, file=name):
                 self.stage_alone({name: key + " = " + value + "\n"})
                 self.assert_blocked(self.check(), "secret-assignment")
 
@@ -250,7 +267,7 @@ class SecurityTests(unittest.TestCase):
         references = "password: password\n"
         self.stage_alone({"Login.vue": references})
         self.assert_blocked(self.check(), "secret-assignment")
-        self.stage_alone({"Login.vue": references}, {"secret-assignment": {"fileTypes": {".VUE": "javascript"}}})
+        self.stage_alone({"Login.vue": references}, {"secret-assignment": {"fileTypes": {".VUE": "quoted"}}})
         self.assertEqual(self.check().returncode, 0)
         self.stage_alone({"Login.swift": references}, {"secret-assignment": {"fileTypes": {".swift": "config"}}})
         self.assert_blocked(self.check(), "secret-assignment")
