@@ -151,6 +151,8 @@ def main(release_ready=False):
         "skills/sweep/SKILL.md",
         "scripts/wip.py",
         "hooks/ssot_check.py",
+        "hooks/pr_preflight.py",
+        "docs/references/pr-preflight.md",
         "docs/references/ssot.md",
         "hooks/pr_event.py",
         "docs/references/work-records.md",

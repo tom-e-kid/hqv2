@@ -132,6 +132,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git Hook | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git Hook | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git Hook | 同上 | 項目 7 の導入 |
+| PR 作成前 | `PreToolUse` | Plugin Hook | 対象を明示した作成呼び出しについて、remote の base/head の変更に含まれる作業記録を確認する。未完了の記録は作成を一旦止め、最後の PR かの判断を促す。中間 PR は判断理由を保存して再実行できる | [PR 作成前の作業記録確認](docs/references/pr-preflight.md)。状態を自動変更しない。対象不明・取得失敗も停止 |
 | PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットを判定する。SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていなければ、SSOT の確認・更新が必要か確かめるようモデルへ伝える。判定できない理由や確認できなかったことも伝える | PR の作成を検出したとき。PR の head で SSOT が未登録なら何も出さない |
 | PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin Hook | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
@@ -585,6 +586,7 @@ hooks/hooks.json                    Claude Code 用 Plugin Hook
 hooks/codex.json                    Codex 用 Plugin Hook（中断イベントを含む）
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
 hooks/ssot_check.py                 作成した PR の SSOT の確認漏れの注意
+hooks/pr_preflight.py               PR 作成前の作業記録確認・停止と再実行
 hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
 skills/pr-feedback/references/operations.md                 オプトインと運用・検証
@@ -593,6 +595,7 @@ scripts/commit_security.py           コミット対象のセキュリティチ�
 scripts/setup_security.py            Git Hook の導入・更新・状態確認
 scripts/wip.py                       作業記録の一覧・削除判定・PR 作成時の SSOT 確認
 docs/references/work-records.md                 作業記録の形式・状態・削除の条件
+docs/references/pr-preflight.md                 PR 作成前の停止・判断と対応・再実行
 docs/references/ssot.md                         SSOT の定義・登録・影響と PR 作成時の確認
 docs/references/commit-security.md              利用先への導入と検出範囲
 examples/project/                   利用先の指示・Git・リリース規約・設定の記載例

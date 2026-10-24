@@ -77,3 +77,7 @@ done
 `python3 -m unittest discover -s tests -v` で、待機・ページ分割・複数レビュアー・失敗・排他・再開・上限・Hook 入出力を確認します。[運用手順](../skills/pr-feedback/references/operations.md) に沿って利用するツールの新しいセッションで PR 作成後の登録、Stop による待機・継続、返信・Resolve、修正後の再確認、対応回数の上限と終了報告を検証します。API を差し替えたテストやマニフェスト検証だけでツール内の動作を確認済みとしません。Codex の Interrupt と Codex・Claude Code の SessionEnd も対象です。
 
 レビュアーの設定変更では、文字列との互換性、`waitAfterPush` が true/false の混在、初回未到着、現 head の再レビュー未到着、下書き・取り消し、追加指摘、Resolve の対象者判定、旧状態・対応回数の上限の保持を確認します。総評を除外したレビューの到着でも静穏期間を取り直し、期限到達だけで収束しない境界条件を含めます。
+
+## PR 作成前の作業記録確認
+
+`python3 -m unittest discover -s tests -p 'test_pr_preflight.py' -v` で、停止・中間 PR の再実行・base/head の変更による再確認・不正状態・取得失敗・設定した保存先を確認します。作成後の SSOT Hook は別の確認として維持します。利用するツール内での停止・理由の配送・再実行は [S52](ssot/validation-checklist.md#s52-pr-作成前の作業記録確認) で確認し、自動テストの成功と区別します。
