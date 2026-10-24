@@ -48,7 +48,7 @@ PR (2): `sdd.path` と PR 作成前チェック
 - [x] 再レビューで改行区切りの `cd` の見落としを指摘された（2026-10-24）。シェルの解析による推定をやめ、Hook を `PostToolUse` に移して作成された PR の head・base のコミットを判定する。`check-pr` に `--head` を加え、設定と状態ファイルを判定するコミットから読むようにした。
 - [x] 再々レビューの指摘に対応する（2026-10-24）。PR のコミットを確認できない場合は、作業中の checkout に記録がなくても未確認と伝える。`impact-mismatch` を変更全体の判定にした。
 - [x] PR #22 が develop に取り込まれた（2026-10-24、merge commit `1a6810a`）。
-- [x] 共通 Skill `sweep` を試す（2026-10-24）。Claude Code の既存セッションで `/hq:sweep` を実行し、取り込み先に `done` が入った `20261022-worktree-default-policy` を削除して参照を付け替える変更を、別 PR にした。
+- [x] 共通 Skill `sweep` を試す（2026-10-24）。Claude Code の既存セッションで `/hq:sweep` を実行し、取り込み先に `done` が入った `20261022-worktree-default-policy` を削除して参照を付け替える変更を、別 PR にした（[PR #24](https://github.com/tom-e-kid/hqv2/pull/24)）。
 - [x] PR #22 の再レビュー指摘2件に対応する（2026-10-24）。移動を検出せずに変更を取り、SSOT の文書を範囲外へ移す変更を SSOT の変更に数える。PR とリモートの照合にホストを含め、別ホストの同名リポジトリや SSH のホスト別名は未確認にする。
 - [x] SSOT の再定義に合わせて PR #22 を作り直す（2026-10-24）。`docs/ssot.md` に定義・登録・影響・PR 作成時の確認を置き、`docs/work-records.md` は記録の規則だけにした。`ssot.paths` の読み取りと検証、`check-pr` の注意（`ssot-review`）と判定できない理由（`invalid-status`・`ssot-missing`）、Hook の改名（`hooks/ssot_check.py`）、`ssotImpact` への改名（雛形と既存記録4件）、wip・sdd・pr・git の Skill、雛形、README、利用先の例、検証手順、CHANGELOG、Codex マニフェストを更新した。
 
