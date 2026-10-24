@@ -201,6 +201,119 @@ class SecurityTests(unittest.TestCase):
         self.stage(".hq/v2/security.json", json.dumps({"version": 1, "allow": [entry]}))
         self.assertEqual(self.check().returncode, 0)
 
+    def stage_alone(self, files, rules=None):
+        """Replace the index with these files, plus a policy holding the rule settings."""
+        self.git("read-tree", "--empty")
+        if rules is not None:
+            files = {**files, ".hq/v2/security.json": json.dumps({"version": 1, "allow": [], "rules": rules})}
+        for name, content in files.items():
+            self.stage(name, content)
+
+    def test_code_values_need_quotes_by_file_type(self):
+        # Fixture lines are joined at run time so this file does not trip the check, including older copies.
+        pairs = (("password", ": ", "password"), ("self.accessToken", " = ", "accessToken"), ("if let token", " = ", "paramToken {"), ("let token", ": ", "AccessToken"))
+        references = "".join(key + separator + value + "\n" for key, separator, value in pairs)
+        for name in ("Login.swift", "Upper.SWIFT", "Login.kt", "login.ts", "login.py", "login.rb", "Login.m"):
+            with self.subTest(code=name):
+                self.stage_alone({name: references})
+                self.assertEqual(self.check().returncode, 0)
+        # Formats with bare values, and unknown types, keep reading bare values as literals.
+        for name in ("config.yml", "notes.txt", "Fastfile"):
+            with self.subTest(config=name):
+                self.stage_alone({name: references})
+                self.assert_blocked(self.check(), "secret-assignment")
+        literal = '"' + "not-a-real-credential-1" + '"'
+        for key in ("let apiKey", "// let apiKey"):
+            with self.subTest(quoted=key):
+                self.stage_alone({"Login.swift": key + " = " + literal + "\n"})
+                self.assert_blocked(self.check(), "secret-assignment", literal)
+
+    def test_interpolation_is_language_specific(self):
+        expressions = (
+            ("Token.swift", "let token", '"\\(header).\\(payload).signature"'),
+            ("Token.kt", "val token", '"$header.$payload.signature"'),
+            ("Token.kt", "val idToken", '"${header}.${payload}.signature"'),
+            ("token.ts", "const authorization", '"Bearer ${accessToken}"'),
+            ("token.rb", "token", '"#{header}.#{payload}.signature"'),
+        )
+        for name, key, value in expressions:
+            with self.subTest(expression=key, file=name):
+                self.stage_alone({name: key + " = " + value + "\n"})
+                self.assertEqual(self.check().returncode, 0)
+        # Another language's syntax is literal text, so the value stays concrete.
+        for name, key, value in (("Token.swift", "let token", '"$header.$payload.signature"'), ("token.py", "token", '"\\(header).\\(payload).signature"')):
+            with self.subTest(literal=name):
+                self.stage_alone({name: key + " = " + value + "\n"})
+                self.assert_blocked(self.check(), "secret-assignment")
+
+    def test_policy_overrides_file_types(self):
+        references = "password: password\n"
+        self.stage_alone({"Login.vue": references})
+        self.assert_blocked(self.check(), "secret-assignment")
+        self.stage_alone({"Login.vue": references}, {"secret-assignment": {"fileTypes": {".VUE": "javascript"}}})
+        self.assertEqual(self.check().returncode, 0)
+        self.stage_alone({"Login.swift": references}, {"secret-assignment": {"fileTypes": {".swift": "config"}}})
+        self.assert_blocked(self.check(), "secret-assignment")
+        # The longest matching suffix wins over the default for the shorter one.
+        files = {"build.gradle.kts": references, "settings.kts": references}
+        self.stage_alone(files, {"secret-assignment": {"fileTypes": {".gradle.kts": "config"}}})
+        result = self.check()
+        self.assert_blocked(result, "secret-assignment")
+        self.assertIn("build.gradle.kts", result.stderr)
+        self.assertNotIn("settings.kts", result.stderr)
+        self.stage_alone({"Login.swift": references}, {})
+        self.assertEqual(self.check().returncode, 0)
+
+    def test_invalid_rule_settings_stop_the_check(self):
+        invalid = (
+            {"secret-assignment": {"fileTypes": {".swift": "python"}}},
+            {"secret-assignment": {"fileTypes": {"swift": "quoted"}}},
+            {"secret-assignment": {"fileTypes": {".": "quoted"}}},
+            {"secret-assignment": {"fileTypes": {".swift": "quoted", ".SWIFT": "config"}}},
+            {"secret-assignment": {"paths": {}}},
+            {"local-path": {}},
+            {"unscannable": {"binaries": "false"}},
+            {"unscannable": {"binaryTypes": {".png": "no"}}},
+            {"unscannable": {"binaryTypes": [".png"]}},
+            [],
+        )
+        for rules in invalid:
+            with self.subTest(rules=json.dumps(rules)[:40]):
+                self.stage_alone({"safe.txt": "safe\n"}, rules)
+                self.assertEqual(self.check().returncode, 2)
+        self.stage(".hq/v2/security.json", json.dumps({"version": 1, "allow": [], "excludes": []}))
+        self.assertEqual(self.check().returncode, 2)
+
+    def test_binaries_setting_limits_unscannable_to_listed_types(self):
+        png = b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR"
+        off = {"unscannable": {"binaries": False}}
+        self.stage_alone({"Assets/icon.png": png})
+        self.assert_blocked(self.check(), "unscannable")
+        self.stage_alone({"Assets/icon.png": png, "Docs/Guide.PDF": b"%PDF-1.7\n\xe2\xe3\x00"}, off)
+        self.assertEqual(self.check().returncode, 0)
+        # Readable parts are still inspected, and nothing else becomes silently accepted.
+        value = "gh" + "p_" + "Ab3D" * 10
+        self.stage_alone({"Assets/icon.png": png + b"\n" + value.encode()}, off)
+        result = self.check()
+        self.assert_blocked(result, "service-token", value)
+        self.assertNotIn("unscannable", result.stderr)
+        for name, content in (("data.bin", b"a\x00b"), ("large.png", png + b"a" * (10 * 1024 * 1024))):
+            with self.subTest(still_unscannable=name):
+                self.stage_alone({name: content}, off)
+                self.assert_blocked(self.check(), "unscannable")
+        self.stage_alone({"data.bin": b"a\x00b", "icon.png": png}, {"unscannable": {"binaries": False, "binaryTypes": {".bin": True, ".png": False}}})
+        result = self.check()
+        self.assert_blocked(result, "unscannable")
+        self.assertIn("icon.png", result.stderr)
+        self.assertNotIn("data.bin", result.stderr)
+        self.stage_alone({"data.bin": b"a\x00b"}, {"unscannable": {"binaryTypes": {".bin": True}}})
+        self.assert_blocked(self.check(), "unscannable")
+        self.stage_alone({"safe.txt": "safe\n"}, off)
+        self.git("commit", "-qm", "fixture")
+        oid = self.git("rev-parse", "HEAD").strip()
+        self.git("update-index", "--add", "--cacheinfo", f"160000,{oid},nested-module")
+        self.assert_blocked(self.check(), "unscannable")
+
     def test_hook_blocks_commit_and_missing_payload(self):
         self.assertEqual(self.setup_hook().returncode, 0)
         self.stage(".env", "APP_MODE=production\n")
