@@ -10,8 +10,9 @@ wip・pr・git は作成前に最後の PR かを判断し、sweep は PR がす
 
 ## Pre チェック
 
-`hooks/pr_preflight.py` を両ツールの `PreToolUse` に登録する。既存の作成後 SSOT チェック・AI レビュー監視は維持する。
+`hooks/pr_preflight.py` を両ツールの `PreToolUse` に登録する。ツールの作業ディレクトリのリポジトリで wip.prPreflight: true が明示された場合だけ停止を適用し、未設定・false・Git 外は停止しない。適用確認はPR対象の解析・API呼び出しに先立って行う。既存の作成後 SSOT チェック・AI レビュー監視は維持する。
 
+- `hooks/pr_shell.py` は改行・heredoc 終端後・前置き代入・既知のラッパーを作成候補の検出だけに使う。引数やheredoc本文はコマンドとして検索せず、任意のshell評価や対象推測はしない。
 - 単独の gh pr create の明示した repository・base・head、または既知の MCP 入力形式から対象を取得する。複雑なシェル・省略・未知の形式を推測しない。未対応形式は未確認として止め、対応する明示形式を案内する。
 - ホストを含めて remote と照合し、gh api の remote の branch ref から base/head のコミットを取得する。コミットがローカルに存在することを確認する。未取得は fetch を案内し、勝手に fetch しない。
 - head の設定・状態ファイルを読む。merge base からの変更に含まれる記録を対象とする。SSOT 未定義でも同じ確認を行い、削除された記録は対象外とする。

@@ -24,6 +24,7 @@ class PreflightTests(unittest.TestCase):
         self.git('config', 'commit.gpgsign', 'false')
         self.git('remote', 'add', 'origin', 'git@github.com:owner/repo.git')
         self.write('README.md', 'base\n')
+        self.write('.hq/v2/settings.json', {'wip': {'path': 'wip', 'prPreflight': True}})
         self.commit()
         self.base = self.git('rev-parse', 'HEAD').strip()
         self.git('switch', '-qc', 'feat')
@@ -33,10 +34,12 @@ class PreflightTests(unittest.TestCase):
         gh.write_text('''#!/usr/bin/env python3
 import json, os, sys
 if os.environ.get('GH_FAIL'): sys.exit(1)
+with open(os.environ['GH_LOG'], 'a') as log: log.write('called\\n')
 ref = sys.argv[-1]
 print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop') else 'HEAD_SHA']}}))
 ''')
         gh.chmod(0o755)
+        self.env['GH_LOG'] = str(Path(self.tmp.name) / 'gh.log')
         self.env['PATH'] = str(bin_dir) + os.pathsep + self.env.get('PATH', '')
 
     def tearDown(self):
@@ -130,7 +133,7 @@ print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop'
         self.denied(self.run_hook())
 
     def test_missing_status_and_custom_record_path(self):
-        self.write('.hq/v2/settings.json', {'wip': {'path': 'records'}})
+        self.write('.hq/v2/settings.json', {'wip': {'path': 'records', 'prPreflight': True}})
         self.write('records/task/work.md', '# Record')
         self.commit()
         self.assertIn('status.json', self.denied(self.run_hook()))
@@ -198,7 +201,7 @@ print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop'
         self.assertIsNone(self.run_hook('/usr/local/bin/gh pr create -R owner/repo -B develop -H feat'))
 
     def test_invalid_settings_do_not_fall_back(self):
-        self.write('.hq/v2/settings.json', {'wip': {'path': '../outside'}})
+        self.write('.hq/v2/settings.json', {'wip': {'path': '../outside', 'prPreflight': True}})
         self.commit()
         self.denied(self.run_hook())
         self.assertNotEqual(self.review().returncode, 0)
@@ -222,3 +225,80 @@ print(json.dumps({'object': {'sha': os.environ['BASE' if ref.endswith('/develop'
         other = Path(self.tmp.name) / 'other'
         self.git('worktree', 'add', '--detach', str(other), 'HEAD')
         self.denied(self.run_hook(event={'cwd': str(other)}))
+
+    def test_unconfigured_and_disabled_repositories_do_not_gate(self):
+        self.record()
+        for settings in (None, {}, {'wip': {'path': 'wip'}}, {'wip': {'prPreflight': False}}):
+            with self.subTest(settings=settings):
+                path = self.repo / '.hq/v2/settings.json'
+                if settings is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    self.write('.hq/v2/settings.json', settings)
+                self.assertIsNone(self.run_hook('gh pr create --fill', GH_FAIL='1'))
+                self.assertIsNone(self.run_hook(event={'tool_name': 'mcp__github__create_pull_request',
+                    'tool_input': {'owner': 'elsewhere', 'repo': 'project', 'base': 'main', 'head': 'topic'}}))
+                self.assertFalse(Path(self.env['GH_LOG']).exists())
+
+    def test_outside_git_does_not_gate(self):
+        self.assertIsNone(self.run_hook('gh pr create --fill', event={'cwd': self.tmp.name}))
+
+    def test_nonliteral_creation_forms_stop_before_execution(self):
+        self.record('done')
+        for command in (
+            'git push -u origin feat\ngh pr create --fill',
+            "echo ready # comment with 'unclosed quote\ngh pr create --fill",
+            'CONFIG=1 sudo -u someone gh pr create --fill',
+            "cat > /tmp/body.md <<'EOF'\nBody contains gh pr create\nEOF\ngh pr create --repo owner/repo --base develop --head feat --body-file /tmp/body.md",
+            'GH_REPO=owner/repo gh pr create --fill',
+            "bash -c 'gh pr create --fill'", "sh -c 'gh pr create --fill'",
+            'sudo gh pr create --fill', 'time gh pr create --fill', 'nohup gh pr create --fill',
+            'xargs gh pr create --fill', 'env GH_REPO=owner/repo gh pr create --fill',
+            'sudo -u someone gh pr create --fill', 'xargs -I{} gh pr create --title {}',
+            "bash -lc 'echo ready; gh pr create --fill'",
+        ):
+            with self.subTest(command=command):
+                self.denied(self.run_hook(command))
+
+    def test_command_examples_in_arguments_and_heredoc_bodies_are_not_calls(self):
+        for command in (
+            'grep "gh pr create" README.md', 'echo gh pr create',
+            'command -v gh pr create',
+            "bash -c 'echo gh pr create'", 'sudo echo gh pr create',
+            "cat <<'EOF'\ngh pr create --fill\nunmatched \"quote\nEOF\ngit status",
+            'cat <<-EOF\n\tgh pr create --fill\n\tEOF\ngit status',
+            "cat <<'ONE' <<TWO\ngh pr create\nONE\ngh pr create\nTWO\ngit status",
+            "echo '<<' EOF\ngit status",
+        ):
+            with self.subTest(command=command):
+                self.assertIsNone(self.run_hook(command))
+
+    def test_heredoc_end_restores_command_detection(self):
+        for command in (
+            'cat <<-EOF\n\ttext\n\tEOF\ngh pr create --fill',
+            "cat <<'ONE' <<TWO\ntext\nONE\ntext\nTWO\ngh pr create --fill",
+        ):
+            with self.subTest(command=command):
+                self.denied(self.run_hook(command))
+
+    def test_nonliteral_body_error_explains_body_file(self):
+        for body in ('"$VALUE"', "'`code`'", "'line one\nline two'"):
+            message = self.denied(self.run_hook('gh pr create -R owner/repo -B develop -H feat --body ' + body))
+            self.assertIn('--body-file', message)
+
+    def test_unchanged_active_record_is_outside_the_diff(self):
+        self.record()
+        self.base = self.git('rev-parse', 'HEAD').strip()
+        self.write('README.md', 'implementation-only followup')
+        self.commit()
+        self.assertIsNone(self.run_hook())
+
+    def test_unreadable_scope_is_reported_without_denying(self):
+        self.write('.hq/v2/settings.json', '{broken')
+        result = self.run_hook('gh pr create --fill')
+        self.assertNotIn('permissionDecision', result)
+        self.assertIn('scope unchecked', result['additionalContext'])
+
+    def test_invalid_explicit_switch_is_not_silently_enabled(self):
+        self.write('.hq/v2/settings.json', {'wip': {'prPreflight': 'true'}})
+        self.assertIn('wip.prPreflight', self.denied(self.run_hook('gh pr create --fill')))

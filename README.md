@@ -132,7 +132,7 @@ HQ は2種類の Hook を使い分けます。誰が操作しても止める必�
 | コミット | `pre-commit` | Git Hook | ステージ済みの内容を検査し、問題があればコミットを中止 | 項目 7 の導入 |
 | 自動マージ | `pre-merge-commit` | Git Hook | 同上 | 項目 7 の導入 |
 | `git am` | `pre-applypatch` | Git Hook | 同上 | 項目 7 の導入 |
-| PR 作成前 | `PreToolUse` | Plugin Hook | 対象を明示した作成呼び出しについて、remote の base/head の変更に含まれる作業記録を確認する。未完了の記録は作成を一旦止め、最後の PR かの判断を促す。中間 PR は判断理由を保存して再実行できる | [PR 作成前の作業記録確認](docs/references/pr-preflight.md)。状態を自動変更しない。対象不明・取得失敗も停止 |
+| PR 作成前 | `PreToolUse` | Plugin Hook | 対象を明示した作成呼び出しについて、remote の base/head の変更に含まれる作業記録を確認する。未完了の記録は作成を一旦止め、最後の PR かの判断を促す。中間 PR は判断理由を保存して再実行できる | `wip.prPreflight: true` のリポジトリのみ。[停止と再実行](docs/references/pr-preflight.md)。状態を自動変更しない。適用範囲内の対象不明・取得失敗も停止 |
 | PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、`gh` で取得した head・base のコミットを判定する。SSOT への影響ありの記録があるのに実装だけが変わり SSOT が変わっていなければ、SSOT の確認・更新が必要か確かめるようモデルへ伝える。判定できない理由や確認できなかったことも伝える | PR の作成を検出したとき。PR の head で SSOT が未登録なら何も出さない |
 | PR 作成後 | `PostToolUse` | Plugin Hook | `gh pr create` などの出力から PR を見つけ、AI レビューの監視を登録 | [項目 8](#8-ai-レビューへの自動対応) の有効化 |
 | ターン終了 | `Stop` | Plugin Hook | 監視中の PR のレビューを最長10分待ち、指摘か終了理由があれば処理の継続を指示 | 監視の登録 |
@@ -461,6 +461,7 @@ Gotchas は対象領域で分類し、見出しや本文に操作・技術名・
 ```
 
 - `wip.path`: 作業記録を置くディレクトリ。未指定なら `wip`。
+- `wip.prPreflight`: PR 作成前に作業記録を確認する Plugin Hook の有効化。`true` の場合だけ適用し、未設定・`false` では PR 作成を停止しません。設定例は [PR 作成前の作業記録確認](docs/references/pr-preflight.md) を参照してください。
 - `gotchas.path`: Gotchas を記録するファイル。未指定なら `GOTCHAS.md`。
 - `sdd.path`: sdd が文書を作成・維持するディレクトリ。未指定なら `docs`。
 - `ssot.paths`: SSOT として使う文書（ファイルまたはディレクトリ）のリスト。既定値はなく、未指定なら SSOT は未定義で、PR 作成時の SSOT の確認は適用しません。通常は `sdd.path` と同じ場所を登録します。`.`（ルート）は使えません。定義は [SSOT と PR 作成時の確認](docs/references/ssot.md) にあります。
@@ -587,6 +588,7 @@ hooks/codex.json                    Codex 用 Plugin Hook（中断イベント�
 hooks/pr_feedback.py                PR 作成検知・待機・処理継続
 hooks/ssot_check.py                 作成した PR の SSOT の確認漏れの注意
 hooks/pr_preflight.py               PR 作成前の作業記録確認・停止と再実行
+hooks/pr_shell.py                   既知のシェル形式の PR 作成候補の検出
 hooks/pr_event.py                   PR 作成の検出（共通）
 scripts/pr_feedback.py              GitHub 取得・バッチ・回数・返信・Resolve
 skills/pr-feedback/references/operations.md                 オプトインと運用・検証

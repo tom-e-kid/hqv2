@@ -23,5 +23,9 @@
     "paths": [
       "docs/ssot"
     ]
+  },
+  "wip": {
+    "path": "wip",
+    "prPreflight": true
   }
 }

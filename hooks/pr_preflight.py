@@ -17,6 +17,7 @@ import wip
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pr_event import tool_arguments, tool_command
 from ssot_check import remote_repositories
+from pr_shell import creates
 
 OID = re.compile(r'[0-9a-f]{40}|[0-9a-f]{64}')
 REPOSITORY = re.compile(r'(?:(?P<host>[\w.-]+)/)?(?P<owner>[\w.-]+)/(?P<repo>[\w.-]+)')
@@ -48,19 +49,7 @@ def creation_candidate(event):
         return True
     if event.get('tool_name') not in ('Bash', 'exec_command'):
         return False
-    command = tool_command(event)
-    # A heredoc is opaque content. Inspect its command line, not source/examples written to disk.
-    first = command.split('\n', 1)[0] if '<<' in command else command
-    try:
-        tokens = shell_tokens(first)
-    except ValueError:
-        return bool(re.match(r'\s*gh\s+pr\s+create\b', first))
-    for i in range(len(tokens) - 2):
-        if Path(tokens[i]).name != 'gh' or tokens[i+1:i+3] != ['pr', 'create']:
-            continue
-        if i == 0 or tokens[i-1] in ('&&', '||', ';', '|', '&', '(') or tokens[0] in ('env', 'command', 'exec'):
-            return True
-    return False
+    return creates(tool_command(event))
 
 
 def pending_target(event):
@@ -83,7 +72,7 @@ def pending_target(event):
     command = tool_command(event)
     # Only a single literal invocation. Do not emulate shell expansion, wrappers, cwd changes or aliases.
     if any(c in command for c in ('$','`','\n','\r')):
-        raise Unchecked('Use a separate literal gh pr create command with --repo, --base and --head.')
+        raise Unchecked('Shell expansion characters ($ or backticks) or newlines are present. Pass the PR body with --body-file, and use a separate literal gh pr create with --repo, --base and --head.')
     try:
         tokens = shell_tokens(command)
     except ValueError:
@@ -184,14 +173,37 @@ def deny(message):
 
 
 def handle(event):
-    if event.get('hook_event_name') != 'PreToolUse' or not creation_candidate(event):
+    if event.get('hook_event_name') != 'PreToolUse':
+        return None
+    name = event.get('tool_name', '')
+    if name not in ('Bash', 'exec_command') and not re.search(r'(?:create_pull_request|pull_request_create)$', name):
+        return None
+    # Scope comes from the tool's working repository before interpreting the PR target.
+    cwd = tool_arguments(event).get('workdir') or event.get('cwd')
+    if not isinstance(cwd, str) or not Path(cwd).is_dir():
         return None
     try:
-        selected = pending_target(event)
-        cwd = tool_arguments(event).get('workdir') or event.get('cwd')
-        if not isinstance(cwd, str) or not Path(cwd).is_dir():
-            raise Unchecked('The tool working directory could not be determined.')
         root = wip.repository_root(cwd)
+    except (wip.WipError, OSError):
+        return None  # Outside Git: there is no repository opting in to this check.
+    try:
+        config = wip.settings(root)
+    except (wip.WipError, OSError, UnicodeError):
+        if not creation_candidate(event):
+            return None
+        return {'hookSpecificOutput': {'hookEventName': 'PreToolUse', 'additionalContext':
+            'HQ PR preflight scope unchecked: shared settings could not be read. '
+            'No explicit opt-in was established, so this hook did not block PR creation.'}}
+    section = config.get('wip', {})
+    enabled = section.get('prPreflight', False) if isinstance(section, dict) else False
+    if enabled is False:
+        return None
+    if not creation_candidate(event):
+        return None
+    if enabled is not True:
+        return deny('Unchecked: wip.prPreflight must be true or false; fix the explicit setting.')
+    try:
+        selected = pending_target(event)
         result = inspect(root, selected)
         errors = [f"{r['path']}: {r['problem']}" for r in result['records'] if r['problem']]
         if errors:

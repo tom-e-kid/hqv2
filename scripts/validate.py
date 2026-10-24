@@ -152,6 +152,7 @@ def main(release_ready=False):
         "scripts/wip.py",
         "hooks/ssot_check.py",
         "hooks/pr_preflight.py",
+        "hooks/pr_shell.py",
         "docs/references/pr-preflight.md",
         "docs/references/ssot.md",
         "hooks/pr_event.py",
@@ -207,6 +208,8 @@ def main(release_ready=False):
                 require(isinstance(value, str) and value.strip() == value and value, f"{relative}: {key}.path must be a non-empty string")
                 path = PurePosixPath(value)
                 require(not path.is_absolute() and ".." not in path.parts, f"{relative}: {key}.path must stay inside the repository")
+        if isinstance(settings.get("wip"), dict) and "prPreflight" in settings["wip"]:
+            require(isinstance(settings["wip"]["prPreflight"], bool), f"{relative}: wip.prPreflight must be a boolean")
         if "ssot" in settings:
             # The SSOT is registered explicitly; the repository root would cover the implementation too.
             section = settings["ssot"]

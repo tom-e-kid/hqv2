@@ -4,11 +4,19 @@ Codex・Claude Code の `PreToolUse` Plugin Hook は、PR 作成前に作業記�
 
 ## 対象と停止条件
 
+この停止はリポジトリごとの明示的な有効化が必要です。共有設定 `.hq/v2/settings.json` の作業記録の保存先に、次の設定を追加します。Plugin の導入だけでは有効になりません。
+
+```json
+{"wip": {"path": "wip", "prPreflight": true}}
+```
+
+Hook はツールの作業ディレクトリ（明示した workdir、なければイベントの cwd）のリポジトリでこの設定を読みます。未設定・`false`・Git リポジトリ外は、PR 対象の解析や GitHub API の呼び出しを行わず停止しません。作業記録の存在や `wip.path` の設定だけでは有効化しません。有効な JSON として設定を読めず明示的な有効化を確認できない場合は、未確認の通知だけを返し、停止しません。`prPreflight` 自体に真偽値以外を指定した場合は設定不正として停止します。有効化したリポジトリ内では、別リポジトリを対象とする MCP 操作も含め、対象不明は引き続き停止します。不要ならこの設定を `false` にできます。手動の CLI 確認は明示的に起動するため、この Hook 用の有効化設定とは独立です。
+
 検出対象は `gh pr create` と、名前が `create_pull_request` または `pull_request_create` で終わる MCP ツールです。Plugin Hook の対象外の作成経路・ホストでの Hook 無効化・Hook の未信頼を含め、すべての作成操作を止める仕組みではありません。Hook に依存せず Skill の手順でも確認します。
 
-シェルでは、単独の `gh pr create --repo [host/]owner/repo --base <branch> --head <branch>` として対象を明示します。本文は `--body-file` で渡せます。省略値、環境変数展開、複合コマンド・ラッパー・未対応の引数形式から対象を推測せず、別の単独呼び出しへ分けるよう伝えて停止します。MCP は `owner`・`repo` または `repository_full_name` と、`base`・`head`（`base_branch`・`head_branch` も可）から読みます。ホストの省略は github.com を意味します。現在は同じリポジトリ内のブランチを対象とし、fork の head や `head_repo` を指定する経路は未対応として停止します。
+シェルでは、単独の `gh pr create --repo [host/]owner/repo --base <branch> --head <branch>` として対象を明示します。本文は `--body-file` で渡せます。作成候補を検出した場合、省略値、環境変数展開、複合コマンド・ラッパー・未対応の引数形式から対象を推測せず、別の単独呼び出しへ分けるよう伝えて停止します。改行はコマンドの区切りとして扱い、heredoc の本文を飛ばして終端後のコマンドも確認します。変数代入の前置き、env・sudo・time・nohup・xargs・command・exec、sh・bash・dash・zsh・ksh の `-c` の既知の形式は、実行位置にある作成候補だけを検出します。grep・echo の引数や heredoc のデータ本文は検索しません。これは限られた形式の静的な候補検出であり、変数に格納した実行コマンド・alias・外部スクリプト・任意の shell 文法まで展開しません。本文に `$`・バッククォート・改行を含む場合の停止理由では、`--body-file` への切り替えを案内します。MCP は `owner`・`repo` または `repository_full_name` と、`base`・`head`（`base_branch`・`head_branch` も可）から読みます。ホストの省略は github.com を意味します。現在は同じリポジトリ内のブランチを対象とし、fork の head や `head_repo` を指定する経路は未対応として停止します。
 
-対象リポジトリをホスト込みでローカルの remote と照合し、`gh api` で remote の base/head のコミットを取得します。必要なコミットは事前に fetch してください。設定 `wip.path` と記録は head のコミットから読み、merge base からの変更に含まれる記録を確認します。SSOT の有無に依存しません。削除された記録は完了判断の対象外です。
+対象リポジトリをホスト込みでローカルの remote と照合し、`gh api` で remote の base/head のコミットを取得します。必要なコミットは事前に fetch してください。設定 `wip.path` と記録は head のコミットから読み、merge base からの変更に含まれる記録を確認します。SSOT の有無に依存しません。削除された記録と、この PR の変更に含まれない記録は完了判断の対象外です。最後の PR が記録に触れていない場合の done 漏れは Hook で検出できないため、Skill の手順で対応する記録と残作業を確認します。
 
 - 記録なし、または全記録が `done`: このチェックでは止めません。Done When の内容まで確認済みという意味ではありません。
 - `active`・`paused` がある: 最後の PR かの確認が必要として止めます。
