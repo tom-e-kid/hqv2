@@ -1,7 +1,8 @@
 {
   "status": "active",
-  "sotImpact": true,
+  "ssotImpact": true,
   "prs": [
-    21
+    21,
+    22
   ]
 }

@@ -14,19 +14,8 @@ import subprocess
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from pr_feedback import FeedbackError, Monitor, NotRepository
 
-
-def creation_candidate(event):
-    name = event.get('tool_name', '')
-    arguments = event.get('tool_input', {})
-    if isinstance(arguments, str):
-        try:
-            arguments = json.loads(arguments)
-        except ValueError:
-            return False
-    if not isinstance(arguments, dict):
-        return False
-    command = arguments.get('command', arguments.get('cmd', ''))
-    return bool(re.search(r'\bgh\s+pr\s+create\b', command if isinstance(command, str) else '')) or bool(re.search(r'(?:create_pull_request|pull_request_create)$', name))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from pr_event import creation_candidate
 
 
 def continuation(message):

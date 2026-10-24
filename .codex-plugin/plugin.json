@@ -9,7 +9,7 @@
   "interface": {
     "displayName": "HQ",
     "shortDescription": "開発ノウハウと支援機能をまとめた Plugin",
-    "longDescription": "開発で繰り返し使う手法を共通 Skill として提供し、製品固有の支援機能も必要に応じて収録する Plugin です。現在は、プロジェクトの大枠を相談して docs/ に残す sdd、具体的な作業を相談・実装・検証・再開する wip、完了した作業記録を整理する sweep、プロジェクトの落とし穴を参照・記録・整理する gotchas、Git・GitHub の作業準備・コミット・PR・取り込みを進める git、PR のタイトル・本文を整理して作成・更新する pr、CHANGELOG・バージョンの整理とリリースを扱う release を収録しています。AI Reviewer の指摘への対応と再確認を扱う pr-feedback も提供します。コミット前のセキュリティチェックと、導入状態を確認する SessionStart Hook と PR フィードバック監視用 Hook も提供します。",
+    "longDescription": "開発で繰り返し使う手法を共通 Skill として提供し、製品固有の支援機能も必要に応じて収録する Plugin です。現在は、プロジェクトの大枠を相談して docs/ に残す sdd、具体的な作業を相談・実装・検証・再開する wip、完了した作業記録を整理する sweep、プロジェクトの落とし穴を参照・記録・整理する gotchas、Git・GitHub の作業準備・コミット・PR・取り込みを進める git、PR のタイトル・本文を整理して作成・更新する pr、CHANGELOG・バージョンの整理とリリースを扱う release を収録しています。AI Reviewer の指摘への対応と再確認を扱う pr-feedback も提供します。コミット前のセキュリティチェックと、導入状態を確認する SessionStart Hook と PR フィードバック監視用 Hook、作成した PR に SSOT の確認漏れのおそれがあれば伝える Hook も提供します。",
     "developerName": "tom-e-kid",
     "category": "Productivity"
   },

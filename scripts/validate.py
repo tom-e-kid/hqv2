@@ -150,6 +150,10 @@ def main(release_ready=False):
         "skills/wip/assets/wip/status.json",
         "skills/sweep/SKILL.md",
         "scripts/wip.py",
+        "hooks/ssot_check.py",
+        "docs/ssot.md",
+        "hooks/pr_event.py",
+        "docs/work-records.md",
         "skills/gotchas/SKILL.md",
         "skills/git/SKILL.md",
         "skills/git/references/settings.md",
@@ -194,13 +198,23 @@ def main(release_ready=False):
         if "commitSecurity" in settings:
             section = settings["commitSecurity"]
             require(isinstance(section, dict) and isinstance(section.get("required"), bool), f"{relative}: commitSecurity.required must be a boolean")
-        for key in ("wip", "gotchas"):
+        for key in ("wip", "gotchas", "sdd"):
             if key in settings:
                 section = settings[key]
                 value = section.get("path") if isinstance(section, dict) else None
                 require(isinstance(value, str) and value.strip() == value and value, f"{relative}: {key}.path must be a non-empty string")
                 path = PurePosixPath(value)
                 require(not path.is_absolute() and ".." not in path.parts, f"{relative}: {key}.path must stay inside the repository")
+        if "ssot" in settings:
+            # The SSOT is registered explicitly; the repository root would cover the implementation too.
+            section = settings["ssot"]
+            values = section.get("paths") if isinstance(section, dict) else None
+            require(isinstance(values, list) and values, f"{relative}: ssot.paths must be a non-empty list")
+            for value in values:
+                require(isinstance(value, str) and value.strip() == value and value, f"{relative}: ssot.paths entries must be non-empty strings")
+                path = PurePosixPath(value)
+                require(not path.is_absolute() and ".." not in path.parts and path != PurePosixPath("."),
+                        f"{relative}: ssot.paths entries must stay inside the repository and must not be its root")
 
     # This repository keeps its own work records; each needs a valid status file.
     for record in wip.records(ROOT):

@@ -16,6 +16,11 @@
         "hooks": [
           {
             "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/ssot_check.py\"",
+            "timeout": 30
+          },
+          {
+            "type": "command",
             "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_feedback.py\"",
             "timeout": 60
           }
