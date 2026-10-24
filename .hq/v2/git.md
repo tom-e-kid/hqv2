@@ -11,7 +11,7 @@
 | 段階 | 必須の確認 |
 | --- | --- |
 | コミット前 | `python3 scripts/validate.py` と `git diff --cached --check`。ステージ内容と CHANGELOG 更新の要否も確認 |
-| PR 作成前・取り込み前 | [検証手順](../../docs/validation.md) にある構造・参照・両製品の配布設定の検証と `git diff --check` |
+| PR 作成前・取り込み前 | [検証手順](../../docs/validation.md) にある構造・参照・Codex・Claude Code の配布設定の検証と `git diff --check` |
 | リリース PR 作成前・取り込み前 | 上記に加え `python3 scripts/validate.py --release`。公開対象・バージョン・CHANGELOG の内容を確認 |
 
 既知のルート `CLAUDE.md` 警告は検証手順の説明に従う。それ以外の警告・エラーを放置しない。同じ変更に対する有効な検証結果は再利用できるが、追加変更・競合解消で影響を受けた検証は再実施する。配布前のモデルによる確認は検証手順のケースから変更に応じて選び、未実施なら明記する。
@@ -26,8 +26,8 @@ remote は `origin`、接続先は `git@github.com:tom-e-kid/hqv2.git`。導入�
 
 導入時点では自動実行する CI を収録していないため、上記の検証を手動で実施し PR に結果を記載する。GitHub 側のブランチ保護・必須 CI・承認条件を追加した場合は、その条件も取り込み前に確認する。
 
-## コミット前のセキュリティチェック
+## コミット前チェック
 
-コミット前は上記の必須検証に加え、`python3 scripts/commit_security.py` を必須とする。[導入手順](../../docs/commit-security.md) に従い、Git の Hook でも実行する。新しい clone では再導入する。`--no-verify` 等で回避せず、検出・検証失敗時はコミットを止める。例外は `.hq/v2/security.json` に対象・規則・内容の fingerprint と理由を記録し、ステージしてレビューする。
+コミット前は上記の必須検証に加え、`python3 scripts/commit_security.py` を必須とする。[導入手順](../../docs/references/commit-security.md) に従い、Git の Hook でも実行する。新しい clone では再導入する。`--no-verify` 等で回避せず、検出・検証失敗時はコミットを止める。例外は `.hq/v2/security.json` に対象・規則・内容の fingerprint と理由を記録し、ステージしてレビューする。
 
 スクリプトや Hook を変更した場合は `python3 -m unittest discover -s tests -v` を実施する。コピー済みコードへの反映は `scripts/setup_security.py update` で明示的に行う。

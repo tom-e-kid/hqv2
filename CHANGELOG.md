@@ -6,21 +6,21 @@
 
 ### Added
 
-- SSOT（正本）の確認漏れを伝える PR 作成時の確認。SSOT は、sdd で作成・維持する PRD・FDS・ADD 等の文書で、共有設定 `.hq/v2/settings.json` の `ssot.paths` に登録する（既定値なし、場所からは推測しない）。SSOT が登録されたプロジェクトで、変更に SSOT への影響ありの作業記録があり、実装が変わって SSOT が変わっていない PR に、SSOT の確認・更新が必要か確かめるよう伝える。整合性は判定せず、注意が出ないことは整合の確認を意味しない。状態ファイルの不正など判定できない理由は別に伝える。`scripts/wip.py check-pr` が判定し、設定と状態ファイルは判定するコミットから読む。pr・git・wip の手順で PR 作成前に確認し、Codex・Claude Code の `PostToolUse` Hook が、エージェントの作成した PR の head・base のコミットに同じ判定を行う。PR とコミットを対応付けられない場合は、未確認であることを伝える。PR 作成は止めない。定義は `docs/ssot.md` にまとめた。
+- SSOT（正本）の確認漏れを伝える PR 作成時の確認。SSOT は、sdd で作成・維持する PRD・FDS・ADD 等の文書で、共有設定 `.hq/v2/settings.json` の `ssot.paths` に登録する（既定値なし、場所からは推測しない）。SSOT が登録されたプロジェクトで、変更に SSOT への影響ありの作業記録があり、実装が変わって SSOT が変わっていない PR に、SSOT の確認・更新が必要か確かめるよう伝える。整合性は判定せず、注意が出ないことは整合の確認を意味しない。状態ファイルの不正など判定できない理由は別に伝える。`scripts/wip.py check-pr` が判定し、設定と状態ファイルは判定するコミットから読む。pr・git・wip の手順で PR 作成前に確認し、Codex・Claude Code の `PostToolUse` の Plugin Hook が、エージェントの作成した PR の head・base のコミットに同じ判定を行う。PR とコミットを対応付けられない場合は、未確認であることを伝える。PR 作成は止めない。定義は `docs/references/ssot.md` にまとめた。
 
 - sdd が文書を作成・維持する場所を、共有設定 `.hq/v2/settings.json` の `sdd.path`（未指定は `docs`）で変更できるようにした。
 
 - 完了した作業記録を整理する `sweep` Skill。取り込み先に `done` の状態が入った記録だけを、知識の反映と参照の付け替えを確認して削除し、状態ファイルの欠落・不正、PR がすべて取り込まれたのに進行中の記録、Done When のない記録などを報告する。取り込み方法には依存しない。判断は remote と Git の履歴から分かる事実だけで行うため、GitHub Actions などのローカル以外の環境でも実行できる。PR はブランチ `chore/sweep`・タイトル `chore: sweep work records`・ラベル `hq:sweep`（なければ作成）の固定の形にし、開いている sweep の PR があれば更新する。
 
-- 作業記録の状態ファイル `status.json`（状態 `active`・`paused`・`done`、SSOT への影響 `ssotImpact`、PR 番号）と、記録の一覧と削除できる記録を判定する `scripts/wip.py`。SSOT への影響（個別の実装判断を方向付ける事項への影響）がある作業は、SSOT の有無にかかわらず必ず記録を作り、ない作業は必要性から判断する。作業の規模では決めない。記録の形式・状態の変更・削除の条件は `docs/work-records.md` にまとめた。
+- 作業記録の状態ファイル `status.json`（状態 `active`・`paused`・`done`、SSOT への影響 `ssotImpact`、PR 番号）と、記録の一覧と削除できる記録を判定する `scripts/wip.py`。SSOT への影響（個別の実装判断を方向付ける事項への影響）がある作業は、SSOT の有無にかかわらず必ず記録を作り、ない作業は必要性から判断する。作業の規模では決めない。記録の形式・状態の変更・削除の条件は `docs/references/work-records.md` にまとめた。
 
 - README に利用先のセットアップ手順と、利用先のセッションに貼り付ける導入プロンプトを追加。利用先で必要な設定を項目ごとに状態確認・選択・再確認しながら導入・変更・取りやめでき、Plugin Hook と Git Hook の役割・動作箇所・対象外の操作を一覧にした。
 
 - コミット前チェックの採用を共有設定の `commitSecurity.required` で宣言する設定。
 
-- 利用先ごとのオプトインで AI Reviewer の指摘を待機・分類・修正・返信・Resolve・再確認する `pr-feedback` Skill、最大3回のバッチ管理と Codex・Claude Code 向け Hook。
+- 利用先ごとのオプトインで AI レビュアーの指摘を待機・分類・修正・返信・Resolve・再確認する `pr-feedback` Skill、最大3回のバッチ管理と Codex・Claude Code 向け Hook。
 
-- ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認、チェックの前に利用先の処理（整形など）を走らせる `<Hook 名>.d/` と、Codex・Claude Code 向けの SessionStart Hook。
+- ステージ済みのローカルパス・env ファイル・秘密情報らしい値を検出するコミット前チェック、Git Hook の導入・更新・状態確認、チェックの前に利用先の処理（整形など）を走らせる `<Hook 名>.d/` と、Codex・Claude Code 向けの SessionStart の Plugin Hook。
 
 - プロジェクトの大枠を相談し、要求・設計の基準を残す `sdd` Skill。
 - 具体的な作業を相談・実装・検証し、記録から再開する `wip` Skill。
@@ -31,6 +31,10 @@
 - Codex・Claude Code 向けの共通 Plugin 構成と、利用先向けの規約・設定例。
 
 ### Changed
+
+- 用語集を基準に、利用するツール・作業記録・Git Hook・Plugin Hook・AI レビュアー・コミット前チェック等の表記を、Skill・利用ガイド・開発規約・設定例で統一。
+
+- Skill 共通資料を `docs/references/`、pr-feedback の運用資料を `skills/pr-feedback/references/operations.md` へ移動し、参照を更新。HQ 自身の PRD 草案と実プロジェクト検証チェックリストを `docs/ssot/` に配置し、既存の動作確認ケースをチェックリストへ集約。利用先の設定と sdd の標準文書構成は変更しない。
 
 - `wip` の要求の書式を Goal・Context・Constraints・Done When に変更し、Done When を完了判断の根拠にした。
 

@@ -1,11 +1,11 @@
-# コミット前のセキュリティチェック
+# コミット前チェック
 
 HQ は、ステージ済みファイルのローカルパス・環境変数ファイル・秘密情報らしい値を検出するスクリプトと、Git Hook の導入・更新手順を提供します。Python 3.10 以上と Git 2.31 以上を使用し、追加の Python パッケージや通常実行時のネットワーク接続は不要です。
 
 ## 利用者の導入手順
 
-1. HQ Plugin をインストールします。この操作だけでは Git 設定や既存 Hook を変更しません。
-2. 対象プロジェクトで「HQ のコミット前チェックを有効にして」と依頼するか、以下のコマンドを実行します。
+1. HQ Plugin をインストールします。この操作だけでは Git 設定や既存 Git Hook を変更しません。
+2. 利用先プロジェクトで「HQ のコミット前チェックを有効にして」と依頼するか、以下のコマンドを実行します。
 3. リポジトリとして使い続ける場合は、[採用を宣言](#採用を宣言する)します。
 4. 通常どおりコミットします。検出・検証失敗時は Git Hook がコミットを中止します。
 
@@ -18,17 +18,17 @@ python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 
 状態が `ready` なら、HQ のコピー済みスクリプトと実行可能な Git Hook が揃っています。検出規則自体の完全性を保証する状態ではありません。
 
-`install` は繰り返し実行できます。導入済みなら `ready` のまま終了し、HQ が設置した以前の版の Hook、実行権限を失った HQ の Hook、欠けたコピーは現在の版に揃えます。HQ 以外の Hook や手編集した Hook があれば、何も変更せず停止します。
+`install` は繰り返し実行できます。導入済みなら `ready` のまま終了し、HQ が設置した以前の版の Git Hook、実行権限を失った HQ の Git Hook、欠けたコピーは現在の版に揃えます。HQ 以外の Git Hook や手編集した Git Hook があれば、何も変更せず停止します。
 
-スクリプトは Git の共通管理ディレクトリ内の `hq-commit-security/check.py` へコピーし、標準の `hooks/pre-commit`・`hooks/pre-merge-commit`・`hooks/pre-applypatch` に同じ呼び出しを設置します。通常のコミット、ローカルの自動マージコミット、`git am` のパッチ適用後のコミットを対象にします。`git cherry-pick`・`git rebase`・`git revert` が作るコミットでは Git がこれらの Hook を実行しないため、競合解消で変更した内容も検査されません。push 時の検査も行いません。グローバル設定と `core.hooksPath` は変更しません。コピーは Git 管理対象にならず、Plugin の移動・アンインストール後も残ります。clone 先では再導入が必要です。同じ Git 共通管理ディレクトリを使う worktree には Hook とコピーを共有し、チェック時は各 worktree の index を読みます。worktree 固有の `core.hooksPath` がある場合は、そちらへの組み込みが必要です。
+スクリプトは Git の共通管理ディレクトリ内の `hq-commit-security/check.py` へコピーし、標準の `hooks/pre-commit`・`hooks/pre-merge-commit`・`hooks/pre-applypatch` に同じ呼び出しを設置します。通常のコミット、ローカルの自動マージコミット、`git am` のパッチ適用後のコミットを対象にします。`git cherry-pick`・`git rebase`・`git revert` が作るコミットでは Git がこれらの Git Hook を実行しないため、競合解消で変更した内容も検査されません。push 時の検査も行いません。グローバル設定と `core.hooksPath` は変更しません。コピーは Git 管理対象にならず、Plugin の移動・アンインストール後も残ります。clone 先では再導入が必要です。同じ Git 共通管理ディレクトリを使う worktree には Git Hook とコピーを共有し、チェック時は各 worktree の index を読みます。worktree 固有の `core.hooksPath` がある場合は、そちらへの組み込みが必要です。
 
-HQ 以外の既存 Git Hook や `core.hooksPath` がある場合、`install` はそれらを上書きせず停止します。既存の Hook を HQ と併用する場合は、その Hook を [`<Hook 名>.d/`](#チェックの前に処理を走らせる) へ移してから `install` すると、チェックの前に実行されます。移した Hook が自身の配置場所を前提にしていないかは確認します。Husky・pre-commit 等、`core.hooksPath` や独自の Hook で管理している場合は、次の操作でスクリプトだけをコピーし、その呼び出しを既存 Hook へ組み込みます。
+HQ 以外の既存 Git Hook や `core.hooksPath` がある場合、`install` はそれらを上書きせず停止します。既存の Git Hook を HQ と併用する場合は、その Git Hook を [`<Hook 名>.d/`](#チェックの前に処理を走らせる) へ移してから `install` すると、チェックの前に実行されます。移した Git Hook が自身の配置場所を前提にしていないかは確認します。Husky・pre-commit 等、`core.hooksPath` や独自の Git Hook で管理している場合は、次の操作でスクリプトだけをコピーし、その呼び出しを既存 Git Hook へ組み込みます。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" prepare --repo .
 ```
 
-既存 Hook 内で実行する処理の例です。既存処理と HQ のどちらの失敗も、Hook 全体の非ゼロ終了へ反映してください。既存管理ツールが別の作業ディレクトリや環境を使う場合は、それに合わせて調整します。
+既存 Git Hook 内で実行する処理の例です。既存処理と HQ のどちらの失敗も、Git Hook 全体の非ゼロ終了へ反映してください。既存管理ツールが別の作業ディレクトリや環境を使う場合は、それに合わせて調整します。
 
 ```sh
 python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" || exit $?
@@ -38,7 +38,7 @@ python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" || exit 
 
 ## 採用を宣言する
 
-リポジトリとしてこのチェックを使う場合は、Git 管理する `.hq/v2/settings.json` に採用を記録します。Git Hook は clone で引き継がれないため、宣言したリポジトリで未導入の checkout を開くと、[セッション開始時の Hook](#plugin-hooks-と保証の境界) がエージェントへ導入を促します。
+リポジトリとしてこのチェックを使う場合は、Git 管理する `.hq/v2/settings.json` に採用を記録します。Git Hook は clone で引き継がれないため、宣言したリポジトリで未導入の checkout を開くと、[セッション開始時の Git Hook](#plugin-hook-と保証の境界) がエージェントへ導入を促します。
 
 ```json
 {
@@ -50,11 +50,11 @@ python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" || exit 
 
 既存の設定がある場合は、他の項目を保持して `commitSecurity` を追加します。宣言がない、または `false` のリポジトリでは未導入を通知しません。checkout 固有の `.hq/v2/.ignore/settings.json` に同じ項目を書くと、その checkout では共有設定より優先します。値が真偽値でない、JSON として読めないなどの場合は、未導入時にその旨を通知します。
 
-宣言は通知の条件です。Hook の導入やコミットの停止を強制するものではありません。採用をやめる場合は、`uninstall` とは別に宣言を削除するか `false` にします。
+宣言は通知の条件です。Git Hook の導入やコミットの停止を強制するものではありません。採用をやめる場合は、`uninstall` とは別に宣言を削除するか `false` にします。
 
 ## チェックの前に処理を走らせる
 
-HQ の Hook は、同じ場所にある `<Hook 名>.d/` の実行ファイルを名前の順に実行してから、最後にチェックを実行します。整形のようにステージ内容を変える処理や、プロジェクト固有の確認は、Hook を書き換えずにここへ置きます。HQ の Hook の内容は変わらないため、`status` は `ready` のままです。
+HQ の Git Hook は、同じ場所にある `<Hook 名>.d/` の実行ファイルを名前の順に実行してから、最後にチェックを実行します。整形のようにステージ内容を変える処理や、プロジェクト固有の確認は、Git Hook を書き換えずにここへ置きます。HQ の Git Hook の内容は変わらないため、`status` は `ready` のままです。
 
 ```bash
 hooks_dir="$(git rev-parse --git-common-dir)/hooks"
@@ -63,14 +63,14 @@ cp <処理のスクリプト> "$hooks_dir/pre-commit.d/10-format"
 chmod +x "$hooks_dir/pre-commit.d/10-format"
 ```
 
-- Hook ごとに `pre-commit.d/`・`pre-merge-commit.d/`・`pre-applypatch.d/` を使います。worktree には共有され、Git 管理対象にはなりません。clone 先では置き直します。
+- Git Hook ごとに `pre-commit.d/`・`pre-merge-commit.d/`・`pre-applypatch.d/` を使います。worktree には共有され、Git 管理対象にはなりません。clone 先では置き直します。
 - 名前の順に実行します。順序は `10-`・`20-` のような番号の接頭辞で決めます。`.` で始まる名前は無視します。
-- 各処理は Hook と同じ作業ディレクトリ・引数・環境変数で実行します。`GIT_INDEX_FILE` も引き継ぐため、`git commit -a`・`git commit --only` でも、コミットに使う index を `git add` 等で更新できます。
+- 各処理は Git Hook と同じ作業ディレクトリ・引数・環境変数で実行します。`GIT_INDEX_FILE` も引き継ぐため、`git commit -a`・`git commit --only` でも、コミットに使う index を `git add` 等で更新できます。
 - チェックは最後に実行し、処理が更新した後の index を検査します。処理がステージした内容も検出の対象です。
 - 処理が非ゼロで終了した場合や、実行できないもの（実行権限のないファイル・ディレクトリ・リンク切れ）がある場合は、チェックの前にコミットを止めます。黙って飛ばしません。
-- 処理の内容は利用先の管理物です。処理はチェックと同じ権限で動くため、信頼できるものだけを置きます。`status` は HQ の Hook とコピーしたチェックだけを確認し、`<Hook 名>.d/` の内容は保証しません。`uninstall` は `<Hook 名>.d/` を残し、以後は実行されなくなります。
+- 処理の内容は利用先の管理物です。処理はチェックと同じ権限で動くため、信頼できるものだけを置きます。`status` は HQ の Git Hook とコピーしたチェックだけを確認し、`<Hook 名>.d/` の内容は保証しません。`uninstall` は `<Hook 名>.d/` を残し、以後は実行されなくなります。
 
-Git 2.54 以降は設定で Hook を追加でき（`hook.<名前>.command`）、HQ の Hook より先に実行されます。それより前の Git は設定の Hook を表示なしで無視するため、使う Git の版や、GUI クライアントが同梱する Git によって処理が抜けます。版によらず実行するには `<Hook 名>.d/` を使います。
+Git 2.54 以降は設定で Git Hook を追加でき（`hook.<名前>.command`）、HQ の Git Hook より先に実行されます。それより前の Git は設定の Git Hook を表示なしで無視するため、使う Git の版や、GUI クライアントが同梱する Git によって処理が抜けます。版によらず実行するには `<Hook 名>.d/` を使います。
 
 ## 普段の使い方
 
@@ -133,30 +133,30 @@ python3 "$(git rev-parse --git-common-dir)/hq-commit-security/check.py" --finger
 
 ## 更新・解除と状態表示
 
-HQ Plugin の更新だけではコピー済みコードと Hook は変更しません。更新内容を確認し、各リポジトリで明示的に更新します。`update` はコピーしたチェックと、以前の版の HQ の Hook を現在の版に置き換えます。コピーを手編集している場合は上書きせず停止します。手編集した Hook や HQ 以外の Hook は置き換えません。
+HQ Plugin の更新だけではコピー済みコードと Git Hook は変更しません。更新内容を確認し、各リポジトリで明示的に更新します。`update` はコピーしたチェックと、以前の版の HQ の Git Hook を現在の版に置き換えます。コピーを手編集している場合は上書きせず停止します。手編集した Git Hook や HQ 以外の Git Hook は置き換えません。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" update --repo .
 python3 "<HQ_ROOT>/scripts/setup_security.py" status --repo .
 ```
 
-`not-installed` は未導入、`damaged` はコピー／管理情報の欠損や変更（HQ の Hook を残したままコピーが消えた状態を含む）、`hook-missing-or-modified` は Hook の欠損・変更・実行権限不足、`external-hook-unverified` は外部管理経路の未確認、`update-available` は稼働するコピーまたは Hook が HQ の現在の版より古いことを示します。問題があれば通常のコミットを進める前に確認します。
+`not-installed` は未導入、`damaged` はコピー／管理情報の欠損や変更（HQ の Git Hook を残したままコピーが消えた状態を含む）、`hook-missing-or-modified` は Git Hook の欠損・変更・実行権限不足、`external-hook-unverified` は外部管理経路の未確認、`update-available` は稼働するコピーまたは Git Hook が HQ の現在の版より古いことを示します。問題があれば通常のコミットを進める前に確認します。
 
-HQ が設置した標準 Hook（以前の版を含む）とコピーを解除する場合は次を使います。同じ Git 共通管理ディレクトリの worktree にも影響します。既存 Hook や外部管理経路がある場合は自動削除せず、先にその管理方法で HQ の呼び出しを除去します。`<Hook 名>.d/` は残します。`uninstall` も繰り返し実行できます。未導入なら何も変更せず成功し、コピーがなく HQ の Hook だけが残っている場合はその Hook を削除します。
+HQ が設置した標準 Git Hook（以前の版を含む）とコピーを解除する場合は次を使います。同じ Git 共通管理ディレクトリの worktree にも影響します。既存 Git Hook や外部管理経路がある場合は自動削除せず、先にその管理方法で HQ の呼び出しを除去します。`<Hook 名>.d/` は残します。`uninstall` も繰り返し実行できます。未導入なら何も変更せず成功し、コピーがなく HQ の Git Hook だけが残っている場合はその Git Hook を削除します。
 
 ```bash
 python3 "<HQ_ROOT>/scripts/setup_security.py" uninstall --repo .
 ```
 
-## Plugin Hooks と保証の境界
+## Plugin Hook と保証の境界
 
 Codex 向けの `hooks/codex.json`、Claude Code 向けの `hooks/hooks.json` で `SessionStart` を提供します。Git リポジトリで導入状態を読み取り、導入後の欠損・変更、外部管理経路の未確認、更新候補をエージェントへ通知します。未導入は、[採用を宣言](#採用を宣言する)したリポジトリでだけ通知します。利用先への書き込み・自動インストールはしません。正常時は何も通知しません。
 
-Codex では Plugin の有効化に加え Hook 定義への信頼が必要です。対応するバージョン・実行環境で確認してください。共通設定は両製品が提供する `CLAUDE_PLUGIN_ROOT` を利用します。
+Codex では Plugin の有効化に加え Plugin Hook 定義への信頼が必要です。対応するバージョン・実行環境で確認してください。共通設定は Codex・Claude Code が提供する `CLAUDE_PLUGIN_ROOT` を利用します。
 
-Plugin Hooks は Git のコミットイベントではなく、他のターミナルや一つのコマンド内でのステージ更新を完全には追跡できません。そのため、停止処理は Git の `pre-commit` 等の Hook が担当します。Python やコピーしたスクリプトがなくなった場合もコミットは失敗します。
+Plugin Hook は Git のコミットイベントではなく、他のターミナルや一つのコマンド内でのステージ更新を完全には追跡できません。そのため、停止処理は `pre-commit` 等の Git Hook が担当します。Python やコピーしたスクリプトがなくなった場合もコミットは失敗します。
 
-GitHub 上で作成するコミットにはローカル Hook は適用されません。Git Hooks は `--no-verify`・設定変更・低レベル Git 操作等で回避でき、clone だけでは有効になりません。通常作業で回避せず、失敗を成功扱いしません。悪意ある改変への強制や全経路での保証が必要な場合は、サーバー側の必須 CI 等を別途設計します。
+GitHub 上で作成するコミットにはローカルの Git Hook は適用されません。Git Hook は `--no-verify`・設定変更・低レベル Git 操作等で回避でき、clone だけでは有効になりません。通常作業で回避せず、失敗を成功扱いしません。悪意ある改変への強制や全経路での保証が必要な場合は、サーバー側の必須 CI 等を別途設計します。
 
 ## 開発時の検証
 
@@ -164,4 +164,4 @@ GitHub 上で作成するコミットにはローカル Hook は適用されま�
 python3 -m unittest discover -s tests -v
 ```
 
-隔離した Git リポジトリで、検出と正常系、部分ステージ、初回コミット、名前変更・削除・特殊なファイル名、worktree、Git の一時 index、例外、読み取り失敗、既存 Hook の保全、`<Hook 名>.d/` の処理の順序・失敗・index の更新、以前の版の Hook の更新、実際のコミット停止を確認します。モデル呼び出しは不要です。配布設定・対象製品での確認は [README の検証手順](../README.md#検証) に従います。
+隔離した Git リポジトリで、検出と正常系、部分ステージ、初回コミット、名前変更・削除・特殊なファイル名、worktree、Git の一時 index、例外、読み取り失敗、既存 Git Hook の保全、`<Hook 名>.d/` の処理の順序・失敗・index の更新、以前の版の Git Hook の更新、実際のコミット停止を確認します。モデル呼び出しは不要です。配布設定・利用するツールでの確認は [README の検証手順](../../README.md#検証) に従います。
