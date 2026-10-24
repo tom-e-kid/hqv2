@@ -1,5 +1,5 @@
 ---
-name: work-maintenance
+name: maintenance
 description: HQ 自体の作業記録を共通 Skill sweep で点検・整理して develop 向け PR にし、続けて取り込み済みの worktree・ブランチの報告と整理などローカルの後処理を行う。手動実行を基本とし、定期実行にも使える。HQ 開発リポジトリ専用の試行用 Skill。
 ---
 
@@ -13,7 +13,7 @@ HQ checkout の作業記録（`.hq/v2/settings.json` の `wip.path`、未指定�
 
 1. CWD の Git ルート・origin が HQ (`tom-e-kid/hqv2`) であることを確認する。[AGENTS.md](../../../AGENTS.md)、[Git 規約](../../../.hq/v2/git.md)、[設定](../../../.hq/v2/settings.json) を読む。Gotchas の記録（`.hq/v2/settings.json` の `gotchas.path`、未指定は `GOTCHAS.md`）または同等の記録があれば関連項目を参照する。
 2. 未コミット変更と進行中の Git 操作、develop 向けの open PR を確認する。開いている sweep の PR（ラベル `hq:sweep`、ブランチ `chore/sweep`）は、目的・差分でも照合する。人間が閉じた未マージ PR を自動で再作成せず、その理由を確認する。
-3. 同一の点検が並行して走らないよう、基準 checkout の `.hq/v2/.ignore/work-maintenance/lock/` を原子的なディレクトリ作成で取得する。保持者と開始時刻を記録し、終了時に自分のロックだけ解放する。既存ロックは奪わず今回を見送る。中断後に残ったロックは保持者の終了を確認するまで削除しない。
+3. 同一の点検が並行して走らないよう、基準 checkout の `.hq/v2/.ignore/maintenance/lock/` を原子的なディレクトリ作成で取得する。保持者と開始時刻を記録し、終了時に自分のロックだけ解放する。既存ロックは奪わず今回を見送る。中断後に残ったロックは保持者の終了を確認するまで削除しない。
 4. origin を fetch し、最新の `origin/develop` を取り込み先・評価の基準にする。主 checkout のブランチ切り替え・pull・stash は行わない。変更が必要になったら、AGENTS.md の指定配置（`.hq/v2/.ignore/worktrees/sweep/`）に develop 系列から `chore/sweep` の worktree を準備する。開いている sweep の PR があれば、対応するブランチ・worktree を再利用する。
 
 別作業や人間の未コミット変更・進行中操作がある checkout は編集せず、強制更新・force-push で解消しない。
@@ -42,6 +42,6 @@ sweep の整理を終えた後（PR の作成・更新、または変更なし�
 
 ## 無変更時と通知
 
-ローカルの実行状態を基準 checkout の `.hq/v2/.ignore/work-maintenance/state.json` に保存する。前回確認した develop のコミット、整理 PR、通知済み確認事項とその根拠を記録し、次回は現在の事実を再確認する。状態ファイル自体は Git に含めない。
+ローカルの実行状態を基準 checkout の `.hq/v2/.ignore/maintenance/state.json` に保存する。前回確認した develop のコミット、整理 PR、通知済み確認事項とその根拠を記録し、次回は現在の事実を再確認する。状態ファイル自体は Git に含めない。
 
 通知は PR の作成・実質的な更新、新しい確認事項（ローカルの後処理で見つけた整理の候補を含む）、実行失敗、復旧時に行う。変更も新しい確認事項もなければ通知しない。未解決事項や同じ失敗を毎週繰り返し通知せず、根拠・状況が変わった場合に更新する。初回で比較情報がなければ全記録を評価する。実行できなかった点検を成功として記録しない。

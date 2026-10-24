@@ -533,13 +533,13 @@ Codex はルートの [AGENTS.md](AGENTS.md)、Claude Code はそれをインポ
 
 ### 作業メモの週次整理（HQ 開発専用・試行）
 
-開発専用の [work-maintenance](.agents/skills/work-maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) で点検・整理し、続けてローカルの後処理を行います。sweep はローカル以外の環境でも動く本体で、この Skill は手元で実行するときの入口と、develop 向け PR・並行実行の防止・通知などの HQ 固有の条件、手元でしかできない後処理を持ちます。後処理では、整理した記録を未取り込みのまま変更しているローカルの作業を報告し、取り込み済みで利用が終わった worktree・ローカルブランチを一覧にします。手動実行では利用者の確認後に削除し、定期実行では報告だけにします。自動マージと remote のブランチの削除はしません。Codex の `$work-maintenance`、Claude Code の `/work-maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/work-maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回は含めません。
+開発専用の [maintenance](.agents/skills/maintenance/SKILL.md) は、HQ 自体の `wip/` を共通 Skill [sweep](skills/sweep/SKILL.md) で点検・整理し、続けてローカルの後処理を行います。sweep はローカル以外の環境でも動く本体で、この Skill は手元で実行するときの入口と、develop 向け PR・並行実行の防止・通知などの HQ 固有の条件、手元でしかできない後処理を持ちます。後処理では、整理した記録を未取り込みのまま変更しているローカルの作業を報告し、取り込み済みで利用が終わった worktree・ローカルブランチを一覧にします。手動実行では利用者の確認後に削除し、定期実行では報告だけにします。自動マージと remote のブランチの削除はしません。Codex の `$maintenance`、Claude Code の `/maintenance` で手動実行もできます。Claude Code 用の入口は `.claude/skills/maintenance` の相対シンボリックリンクです。Plugin 利用先の巡回は含めません。
 
 このリポジトリでは毎週日曜 3:00（日本時間）のローカル定期タスクで試行します。実行時にマシンとアプリが稼働し、GitHub の参照・push・PR 作成に必要な接続と権限が利用できることが前提です。Skill が develop に取り込まれるまでは整理を保留します。変更も新しい確認事項もなければ通知せず、初期の PR で分類・整理漏れ・通知頻度を評価します。定期タスクはローカル設定であり、clone や Plugin の導入では登録されません。
 
 タスクには対象 checkout と、次の実行指示を設定します。評価・整理の基準は Skill に集約します。
 
-> HQ checkout の develop に取り込まれた `.agents/skills/work-maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
+> HQ checkout の develop に取り込まれた `.agents/skills/maintenance/SKILL.md` を読み、その手順で作業メモを点検・整理する。変更があれば検証し、develop 向け PR を作成・更新する。自動マージしない。Skill が未取り込みなら整理を保留する。変更も新しい確認事項もなければ通知しない。
 
 Claude Code では、このローカル Marketplace の構成はソースを直接参照するため、同じバージョンでもソースの変更を新しいセッションで読み込みます。キャッシュ型の更新とは区別します。登録・確認方法は [Claude Code のローカル反映手順](AGENTS.md#claude-code-で開発中のコードを利用先に反映する) を参照してください。
 
