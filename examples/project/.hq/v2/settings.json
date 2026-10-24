@@ -11,7 +11,8 @@
     "versionFiles": []
   },
   "wip": {
-    "path": "wip"
+    "path": "wip",
+    "prPreflight": false
   },
   "gotchas": {
     "path": "GOTCHAS.md"

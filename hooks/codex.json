@@ -60,6 +60,18 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash|.*create_pull_request|.*pull_request_create",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/pr_preflight.py\"",
+            "timeout": 25
+          }
+        ]
+      }
     ]
   }
 }
